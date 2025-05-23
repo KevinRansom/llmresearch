@@ -1,0 +1,4 @@
+.vs/*
+**/__pycache__/*
+/search_agent/.vs
+*.bak
