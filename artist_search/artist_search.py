@@ -4,31 +4,43 @@ import sys_msgs
 import requests
 from bs4 import BeautifulSoup
 import trafilatura
+import pandas as pd
 
+
+assistant_model = 'llama3.1:8b'        #'llama3.1:8b' 'qwen3:8b' 'qwen3:14b'
 assistant_convo = [sys_msgs.assistant_msg]
 
 def search_or_not():
     sys_msg = sys_msgs.search_or_not_msg
 
     response = ollama.chat(
-        model = 'llama3.1:8b',
+        model = assistant_model,
         messages = [{'role': 'system', 'content': sys_msg}, assistant_convo[-1]]
     )
 
+    #print(f"SEARCH OR NOT RESULTS: {content}")
     content = response['message']['content']
-    print(f"SEARCH OR NOT RESULTS: {content}")
 
     if 'true' in content.lower():
         return True
     else:
         return False
 
+def prompt_generator(artist_type, artist_name, artist_nationality, artist_active):
+    return (
+        f'USER:\nWhat is the gender of the {artist_nationality} {artist_type} {artist_name} artist who was active in the period {artist_active}? '
+        f'only answer if these artists are real people, and you can confirm they are a {artist_type} and their nationality is {artist_nationality} '
+        f'Do not generate any explanations. Only generate a response as a single line with the format: ArtistData: artist names, genders, nationality, artist type, artist active\n\n'
+        f'otherwise respond with the format: artist names, biographical data not found.\n\n'
+    )
+
 def query_generator():
+
     sys_msg = sys_msgs.query_msg
     query_msg = f'CREATE A SEARCH QUERY FOR THIS PROMPT: \n{assistant_convo[-1]}'
 
     response = ollama.chat(
-        model = 'llama3.1:8b',
+        model = assistant_model,
         messages = [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': query_msg}]
     )
 
@@ -72,7 +84,7 @@ def best_search_result(s_results, query):
     for _ in range(2):
         try:
             response = ollama.chat(
-                model = 'llama3.1:8b',
+                model = assistant_model,
                 messages = [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': best_msg}]
             )
             return int( response['message']['content'])
@@ -91,7 +103,6 @@ def scrape_webpage(url):
 
 def ai_search():
     context = None
-    print('GENERATING SEARCH QUERY.')
     search_query = query_generator()
     if search_query[0] == '"':
         search_query=search_query[1:-1]
@@ -101,7 +112,7 @@ def ai_search():
 
     while not context_found and len(search_results) > 0:
         best_result = best_search_result(s_results=search_results, query=search_query)
-        print(f'BEST SEARCH RESULT INDEX: {best_result}')
+        #print(f'BEST SEARCH RESULT INDEX: {best_result}')
         try:
             page_link = search_results[best_result]['link']
         except:
@@ -114,7 +125,7 @@ def ai_search():
         if page_text and contains_data_needed(search_content=page_text, query=search_query):
             context = page_text
             context_found = True
-            print('CONTEXT FOUND.')
+            #print('CONTEXT FOUND.')
 
     return context
 
@@ -123,7 +134,7 @@ def contains_data_needed(search_content, query):
     needed_prompt = f'PAGE_TEXT: {search_content} \nUSER_PROMPT: {assistant_convo[-1]} \nSEARCH_QUERY: {query}'
 
     response = ollama.chat(
-        model = 'llama3.1:8b',
+        model = assistant_model,
         messages = [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': needed_prompt}]
     )
 
@@ -138,23 +149,29 @@ def stream_assistant_response():
     global assistant_convo
     response_stream = ollama.chat(model='llama3.1:8b', messages=assistant_convo, stream=True)
     complete_response = ''
-    print ('ASSISTANT:')
 
     for chunk in response_stream:
-        print (chunk['message']['content'], end='', flush=True)
+        # print (chunk['message']['content'], end='', flush=True)
         complete_response += chunk['message']['content']
     
     assistant_convo.append({'role': 'assistant', 'content': complete_response})
-    print('\n\n')
+    #print('\n\n')
+    return complete_response
 
-def main():
+def evaluate_artist(artist_type, artist_name, artist_nationality, artist_active):
     global assistant_convo
 
-    while True:
-        prompt= input('USER: \n')
-        assistant_convo.append({'role': 'user', 'content': prompt})
+    prompt = prompt_generator(
+        artist_type=artist_type,
+        artist_name=artist_name,
+        artist_nationality=artist_nationality,
+        artist_active=artist_active)
 
-        if search_or_not():
+    assistant_convo.append({'role': 'user', 'content': prompt})
+
+    do_search = search_or_not()
+    while True:
+        if do_search :
             context = ai_search()
             assistant_convo = assistant_convo[:-1]
             if context:
@@ -169,8 +186,48 @@ def main():
                     'of how the user would like to proceed.'
                 )
 
-        assistant_convo.append({'role': 'user', 'content': prompt})             
-        stream_assistant_response()
+        assistant_convo.append({'role': 'user', 'content': prompt})
+        content = stream_assistant_response()
+
+        if not(do_search) and 'biographical data not found.' in content.lower():
+            # Asked ai but no data was found try again
+            do_search = True
+        else:
+            for line in content.splitlines():
+                if "ArtistData:" in line:
+                    print(line.partition("ArtistData:")[2].strip())
+            break
+
+def evaluate_list(artists):
+
+    idx = 0
+    for _, row in artists.iterrows():
+        artist_type = "Photographer"                            #input('Artist type (Photographer, Painter etc ..): \n')
+        #artist_name = row["Name"]                               #input('Name: \n')
+        artist_name = row["Artist"]                               #input('Artist: \n')
+        artist_nationality = row["Nationality"]                 #input('Nationality\n')
+        artist_active = ""  #     row["Decade"]                           #input('Century active\n')
+        artist_gender = row["Gender"]                           #input('Artist gender: \n')
+
+        #use ai to turn this into names, nationality, active etc.
+        #brief_description = row["Brief Description"]            #input('Brief Description: \n')
+
+        if pd.isna(artist_gender):
+            evaluate_artist(
+                artist_type = artist_type,
+                artist_name = artist_name,
+                artist_nationality = artist_nationality,
+                artist_active = artist_active)
+
+        idx = idx + 1
+
+def main():
+    csv_path = r"C:\Users\codec\Downloads\V&A Photography Acquisitions 1964-2022 Elizabeth Ransom and Corinne Whitehouse Edit - Sheet1.csv"
+
+    df = pd.read_csv(csv_path)
+#    artists = df[["Name", "Nationality", "Decade"]].drop_duplicates()
+    artists = df[["Artist", "Nationality", "Gender"]].drop_duplicates()
+    evaluate_list(artists)
 
 if __name__ == '__main__':
     main()
