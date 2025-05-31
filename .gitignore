@@ -1,8 +1,7 @@
+**/.data/*
 **/.vs/*
 **/__pycache__/*
 **/obj/*
 **/bin/*
-/search_agent/.vs
 *.bak
-
 .fake
