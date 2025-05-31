@@ -205,7 +205,7 @@ type ArtistSearch() =
 
 [<EntryPoint>]
 let main argv =
-    let csvPath = Path.Combine(__SOURCE_DIRECTORY__, @"..\.data\V&A Photography Acquisitions 1964-2022 Elizabeth Ransom and Corinne Whitehouse Edit - Sheet1.csv")
+    let csvPath = Path.Combine(GetSourceDirectory__SOURCE_DIRECTORY__, @"..\.data\Acquisitions - Sheet1.csv")
     printfn $"{csvPath}"
     let artists =
         ArtistSearch.ReadArtistsFromCsv(csvPath)

@@ -1,15 +1,17 @@
+using CsvHelper;
+using HtmlAgilityPack;
+using OllamaSharp;
+using OllamaSharp.Models.Chat;
+using ReverseMarkdown;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using CsvHelper;
-using HtmlAgilityPack;
-using OllamaSharp;
-using OllamaSharp.Models.Chat;
-using ReverseMarkdown;
+using System.Xml.Linq;
 
 public static class SysMessages
 {
@@ -41,7 +43,7 @@ public class ArtistRow
 public class ArtistSearch
 {
     private readonly OllamaApiClient _ollama;
-    private readonly string _model = "llama3.1:8b";
+    private readonly string _model = "llama3.1:8b";      //"gemma3:12b";
     private List<(string Role, string Content)> assistantConvo = new();
 
     public ArtistSearch()
@@ -49,6 +51,7 @@ public class ArtistSearch
         _ollama = new OllamaApiClient(new Uri("http://localhost:11434"));
         assistantConvo.Add(SysMessages.AssistantMsg);
     }
+
     private async Task<string> OllamaChatAsync(IEnumerable<(string Role, string Content)> convo)
     {
         var request = new ChatRequest
@@ -79,11 +82,21 @@ public class ArtistSearch
 
     private string PromptGenerator(string artistType, string artistName, string artistNationality, string artistActive)
     {
+        var artistActiveClause = String.IsNullOrEmpty(artistActive) ? "" : $"who was active in the period  '{artistActive}'";
+        var artistNameClause = String.IsNullOrEmpty(artistName) ? "" : $"named '{artistName}'";
+        var artistNationalityClause = String.IsNullOrEmpty(artistNationality) ? "" : $"named '{artistNationality}'";
+        var artistTypeClause = String.IsNullOrEmpty(artistType) ? "artist" : $"{artistType}'";
+
         return
-            $"USER:\nWhat is the gender of the {artistNationality} {artistType} {artistName} artist who was active in the period {artistActive}? " +
-            $"only answer if these artists are real people, and you can confirm they are a {artistType} and their nationality is {artistNationality} " +
-            $"Do not generate any explanations. Only generate a response as a single line with the format: ArtistData: artist names, genders, nationality, artist type, artist active\n\n" +
-            $"otherwise respond with the format: artist names, biographical data not found.\n\n";
+            $"""
+            USER:
+            What is the gender of the {artistNationality} {artistType} named {artistName} who was active in the period '{artistActive}'?
+
+            Only answer if the artists are real people, and you can confirm they are {artistType}s and their nationality is {artistNationality}
+            Do not generate any explanations.
+            Only generate a response as a single line with the format: ArtistData: artist names, genders, nationality, artist type, artist active,
+            otherwise respond with the format: artist names, biographical data not found.
+            """;
     }
     private async Task<string> QueryGeneratorAsync()
     {
@@ -135,6 +148,70 @@ public class ArtistSearch
         return results;
     }
 
+    public async Task<string> AiSearchAsync()
+    {
+
+        Console.WriteLine($">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+        Console.WriteLine($"AiSearchAsync:");
+
+        string context = null;
+        string searchQuery = await QueryGeneratorAsync();
+
+        Console.WriteLine($"Generated searchQuery: {searchQuery}");
+        if (!string.IsNullOrEmpty(searchQuery) && searchQuery.StartsWith("\""))
+        {
+            searchQuery = searchQuery.Substring(1, searchQuery.Length - 2);
+        }
+
+        Console.WriteLine($"Generated searchQuery: {searchQuery}");
+
+        var searchResults = await DuckDuckGoSearchAsync(searchQuery);
+        bool contextFound = false;
+
+        Console.WriteLine($"Search results length: {searchResults.Count()}");
+        foreach(var result in searchResults)
+        {
+            Console.WriteLine($"  {result["id"]}: {result["search_description"]} ({result["link"]})");
+        }
+
+        while (!contextFound && searchResults.Count > 0)
+        {
+            int bestResult = await BestSearchResultAsync(searchResults, searchQuery);
+
+            string pageLink;
+            try
+            {
+                pageLink = searchResults[bestResult]["link"];
+            }
+            catch
+            {
+                Console.WriteLine("FAILED TO SELECT BEST SEARCH RESULT, TRYING AGAIN.");
+                break;
+            }
+
+            string pageText = await ScrapeWebpageAsync(pageLink);
+            searchResults.RemoveAt(bestResult);
+
+            if (!string.IsNullOrEmpty(pageText) && await ContainsDataNeededAsync(pageText, searchQuery))
+            {
+                context = pageText;
+                contextFound = true;
+            }
+        }
+
+        Console.WriteLine($"<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+        return context;
+    }
+
+    private async Task<string> ScrapeWebpageAsync(string url)
+    {
+        using HttpClient client = new HttpClient();
+        string htmlContent = await client.GetStringAsync(url);
+
+        var config = new Config { UnknownTags = Config.UnknownTagsOption.PassThrough };
+        var converter = new Converter(config);
+        return converter.Convert(htmlContent);
+    }
     private async Task<int> BestSearchResultAsync(List<Dictionary<string, string>> sResults, string query)
     {
         string bestMsg = $"   SEARCH_RESULTS: {string.Join(", ", sResults)} \n   USER_PROMPT: {assistantConvo[^1]} \n   SEARCH_QUERY: {query}";
@@ -158,17 +235,6 @@ public class ArtistSearch
         return 0;
     }
 
-    // Stub for trafilatura functionality
-    private string ScrapeWebpage(string url)
-    {
-        using HttpClient client = new HttpClient();
-        string htmlContent = client.GetStringAsync(url).Result;
-
-        var config = new Config { UnknownTags = Config.UnknownTagsOption.PassThrough };
-        var converter = new Converter(config);
-        return converter.Convert(htmlContent);
-    }
-
     private async Task<bool> ContainsDataNeededAsync(string searchContent, string query)
     {
         string neededPrompt = $"PAGE_TEXT: {searchContent} \nUSER_PROMPT: {assistantConvo[^1]} \nSEARCH_QUERY: {query}";
@@ -190,10 +256,14 @@ public class ArtistSearch
 
     private async Task EvaluateArtistAsync(string artistType, string artistName, string artistNationality, string artistActive)
     {
+        Console.WriteLine($"vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
+        Console.WriteLine($"Evaluating artist: {artistName}, Type: {artistType}, Nationality: {artistNationality}, Active: {artistActive}");
         string prompt = PromptGenerator(artistType, artistName, artistNationality, artistActive);
         assistantConvo.Add(("user", prompt));
 
         bool doSearch = await SearchOrNotAsync();
+        Console.WriteLine($"doSearch: {doSearch}");
+        Console.WriteLine($"Prompt: {prompt}");
         while (true)
         {
             if (doSearch)
@@ -201,7 +271,7 @@ public class ArtistSearch
                 // ai_search logic (stubbed)
                 // You can implement the full ai_search logic as needed
                 // For now, just set context to null
-                string context = null;
+                string context = await AiSearchAsync();
                 assistantConvo.RemoveAt(assistantConvo.Count - 1);
                 if (context != null)
                 {
@@ -231,6 +301,7 @@ public class ArtistSearch
                 }
                 break;
             }
+            Console.WriteLine($"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
         }
     }
 
@@ -261,9 +332,14 @@ public class ArtistSearch
 
 class Program
 {
+    static string GetSourceDirectory([CallerFilePath] string sourceFilePath = "")
+    {
+        return Path.GetDirectoryName(sourceFilePath);
+    }
+
     static async Task Main(string[] args)
     {
-        string csvPath = @"C:\Users\codec\Downloads\V&A Photography Acquisitions 1964-2022 Elizabeth Ransom and Corinne Whitehouse Edit - Sheet1.csv";
+        string csvPath = Path.Combine(GetSourceDirectory(), "..", ".data", @"Acquisitions - Sheet1.csv");
         var artists = ArtistSearch.ReadArtistsFromCsv(csvPath)
             .GroupBy(a => (a.Artist, a.Nationality, a.Gender))
             .Select(g => g.First());
