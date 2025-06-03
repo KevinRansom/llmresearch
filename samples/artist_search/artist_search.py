@@ -222,7 +222,7 @@ def evaluate_list(artists):
         idx = idx + 1
 
 def main():
-    csv_path = r"C:\Users\codec\Downloads\V&A Photography Acquisitions 1964-2022 Elizabeth Ransom and Corinne Whitehouse Edit - Sheet1.csv"
+    csv_path = r"C:\Users\codec\repos\kevinransom\.data\Acquisitions - Sheet1.csv"
 
     df = pd.read_csv(csv_path)
 #    artists = df[["Name", "Nationality", "Decade"]].drop_duplicates()
