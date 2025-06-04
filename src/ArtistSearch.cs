@@ -42,13 +42,13 @@ namespace ArtistSearch
         public string Gender { get; set; }
     }
 
-    public class DoArtistSearch
+    public class ArtistSearch
     {
         private readonly OllamaApiClient _ollama;
         private readonly string _model = "llama3.1:8b";      //"gemma3:12b";
         private List<(string Role, string Content)> assistantConvo = new();
 
-        public DoArtistSearch()
+        public ArtistSearch()
         {
             _ollama = new OllamaApiClient(new Uri("http://localhost:11434"));
             assistantConvo.Add(SysMessages.AssistantMsg);
@@ -100,146 +100,6 @@ namespace ArtistSearch
                 otherwise respond with the format: artist names, biographical data not found.
                 """;
         }
-        private async Task<string> QueryGeneratorAsync()
-        {
-            string queryMsg = $"CREATE A SEARCH QUERY FOR THIS PROMPT: \n{assistantConvo[^1].Content}";
-            var convo = new List<(string Role, string Content)>
-            {
-                ("system", SysMessages.QueryMsg),
-                ("user", queryMsg)
-            };
-            return await OllamaChatAsync(convo);
-        }
-
-        private async Task<List<Dictionary<string, string>>> DuckDuckGoSearchAsync(string query)
-        {
-            var results = new List<Dictionary<string, string>>();
-            using (var client = new HttpClient())
-            {
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36");
-                string url = $"https://html.duckduckgo.com/html/?q={Uri.EscapeDataString(query)}";
-                var response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                var html = await response.Content.ReadAsStringAsync();
-
-                var doc = new HtmlDocument();
-                doc.LoadHtml(html);
-
-                int i = 1;
-                var nodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'result')]");
-                if (nodes != null)
-                {
-                    foreach (var result in nodes)
-                    {
-                        if (i > 10) break;
-                        var titleTag = result.SelectSingleNode(".//a[contains(@class, 'result__a')]");
-                        if (titleTag == null) continue;
-                        var link = titleTag.GetAttributeValue("href", "");
-                        var snippetTag = result.SelectSingleNode(".//a[contains(@class, 'result__snippet')]");
-                        var snippet = snippetTag != null ? snippetTag.InnerText.Trim() : "No description available";
-                        results.Add(new Dictionary<string, string>
-                        {
-                            { "id", i.ToString() },
-                            { "link", link },
-                            { "search_description", snippet }
-                        });
-                        i++;
-                    }
-                }
-            }
-            return results;
-        }
-
-        public async Task<string> AiSearchAsync()
-        {
-
-            Console.WriteLine($">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-            Console.WriteLine($"AiSearchAsync:");
-
-            string context = null;
-            string searchQuery = await QueryGeneratorAsync();
-
-            Console.WriteLine($"Generated searchQuery: {searchQuery}");
-            if (!string.IsNullOrEmpty(searchQuery) && searchQuery.StartsWith("\""))
-            {
-                searchQuery = searchQuery.Substring(1, searchQuery.Length - 2);
-            }
-
-            Console.WriteLine($"Generated searchQuery: {searchQuery}");
-
-            var searchResults = await DuckDuckGoSearchAsync(searchQuery);
-            bool contextFound = false;
-
-            Console.WriteLine($"Search results length: {searchResults.Count()}");
-            foreach (var result in searchResults)
-            {
-                Console.WriteLine($"  {result["id"]}: {result["search_description"]} ({result["link"]})");
-            }
-
-            while (!contextFound && searchResults.Count > 0)
-            {
-                int bestResult = await BestSearchResultAsync(searchResults, searchQuery);
-
-                string pageLink;
-                try
-                {
-                    pageLink = searchResults[bestResult]["link"];
-                }
-                catch
-                {
-                    Console.WriteLine("FAILED TO SELECT BEST SEARCH RESULT, TRYING AGAIN.");
-                    break;
-                }
-
-                string pageText = await AiSearch.ScrapeWebPageAsync(pageLink);
-                searchResults.RemoveAt(bestResult);
-
-                if (!string.IsNullOrEmpty(pageText) && await ContainsDataNeededAsync(pageText, searchQuery))
-                {
-                    context = pageText;
-                    contextFound = true;
-                }
-            }
-
-            Console.WriteLine($"<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
-            return context;
-        }
-
-        private async Task<int> BestSearchResultAsync(List<Dictionary<string, string>> sResults, string query)
-        {
-            string bestMsg = $"   SEARCH_RESULTS: {string.Join(", ", sResults)} \n   USER_PROMPT: {assistantConvo[^1]} \n   SEARCH_QUERY: {query}";
-            for (int attempt = 0; attempt < 2; attempt++)
-            {
-                try
-                {
-                    var convo = new List<(string Role, string Content)>
-                    {
-                        ("system", SysMessages.BestSearchMsg),
-                        ("user", bestMsg)
-                    };
-                    var content = await OllamaChatAsync(convo);
-                    return int.Parse(content);
-                }
-                catch
-                {
-                    continue;
-                }
-            }
-            return 0;
-        }
-
-        private async Task<bool> ContainsDataNeededAsync(string searchContent, string query)
-        {
-            string neededPrompt = $"PAGE_TEXT: {searchContent} \nUSER_PROMPT: {assistantConvo[^1]} \nSEARCH_QUERY: {query}";
-            var convo = new List<(string Role, string Content)>
-            {
-                ("system", SysMessages.ContainsDataMsg),
-                ("user", neededPrompt)
-            };
-            var content = await OllamaChatAsync(convo);
-            return content.ToLower().Contains("true");
-        }
-
         private async Task<string> StreamAssistantResponseAsync()
         {
             var content = await OllamaChatAsync(assistantConvo);
@@ -251,12 +111,14 @@ namespace ArtistSearch
         {
             try
             {
+                var aiSearch = new AiSearch(OllamaChatAsync);
+
                 Console.WriteLine($"vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
                 Console.WriteLine($"Evaluating artist: {artistName}, Type: {artistType}, Nationality: {artistNationality}, Active: {artistActive}");
                 string prompt = PromptGenerator(artistType, artistName, artistNationality, artistActive);
                 assistantConvo.Add(("user", prompt));
 
-                bool doSearch = true;       //await SearchOrNotAsync();
+                bool doSearch = await SearchOrNotAsync();
                 Console.WriteLine($"doSearch: {doSearch}");
                 Console.WriteLine($"Prompt: {prompt}");
                 while (true)
@@ -266,7 +128,7 @@ namespace ArtistSearch
                         // ai_search logic (stubbed)
                         // You can implement the full ai_search logic as needed
                         // For now, just set context to null
-                        string context = await AiSearchAsync();
+                        string context = await aiSearch.AiSearchAsync(assistantConvo);
                         assistantConvo.RemoveAt(assistantConvo.Count - 1);
                         if (context != null)
                         {
@@ -306,25 +168,19 @@ namespace ArtistSearch
 
         public async Task EvaluateListAsync(IEnumerable<ArtistRow> artists)
         {
-            //foreach (var row in artists)
-            //{
-            //    string artistType = "Photographer";
-            //    string artistName = row.Artist;
-            //    string artistNationality = row.Nationality;
-            //    string artistActive = "";
-            //    string artistGender = row.Gender;
-
-            string artistType = "Photographer";
-            string artistName = "Dye, David";
-            string artistNationality = null;
-            string artistActive = null;
-            string artistGender = null;
-
-            if ((!string.IsNullOrWhiteSpace(artistName)) && string.IsNullOrWhiteSpace(artistGender))
+            foreach (var row in artists)
             {
-                await EvaluateArtistAsync(artistType, artistName, artistNationality, artistActive);
+                string artistType = "Photographer";
+                string artistName = row.Artist;
+                string artistNationality = row.Nationality;
+                string artistActive = null;
+                string artistGender = null; // row.Gender;
+
+                if ((!string.IsNullOrWhiteSpace(artistName)) && string.IsNullOrWhiteSpace(artistGender))
+                {
+                    await EvaluateArtistAsync(artistType, artistName, artistNationality, artistActive);
+                }
             }
-            //}
         }
 
         public static IEnumerable<ArtistRow> ReadArtistsFromCsv(string csvPath)
@@ -345,10 +201,10 @@ namespace ArtistSearch
         static async Task Main(string[] args)
         {
             string csvPath = Path.Combine(GetSourceDirectory(), "..", "..", ".data", @"Acquisitions - Sheet1.csv");
-            var artists = DoArtistSearch.ReadArtistsFromCsv(csvPath)
+            var artists = ArtistSearch.ReadArtistsFromCsv(csvPath)
                 .GroupBy(a => (a.Artist, a.Nationality, a.Gender))
                 .Select(g => g.First());
-            var search = new DoArtistSearch();
+            var search = new ArtistSearch();
             await search.EvaluateListAsync(artists);
         }
     }

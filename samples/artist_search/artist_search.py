@@ -68,24 +68,21 @@ def duckduckgo_search(query):
         link = title_tag['href']
         snippet_tag = result.find('a', class_='result__snippet')
         snippet = snippet_tag.text.strip() if snippet_tag else 'No description available'
-
-        results.append({
-            'id': i,
-            'link': link,
-            'search_description': snippet
-        })
+        row = { 'id': i, 'link': link, 'search_description': snippet }
+        results.append(row)
+        print(f'{row}')
 
     return results
 
 def best_search_result(s_results, query):
     sys_msg = sys_msgs.best_search_msg
     best_msg = f'   SEARCH_RESULTS: {s_results} \n   USER_PROMPT: {assistant_convo[-1]} \n   SEARCH_QUERY: {query}'
-
+    messages_list =  [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': best_msg}]
     for _ in range(2):
         try:
             response = ollama.chat(
                 model = assistant_model,
-                messages = [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': best_msg}]
+                messages = messages_list
             )
             return int( response['message']['content'])
         except:
@@ -169,7 +166,7 @@ def evaluate_artist(artist_type, artist_name, artist_nationality, artist_active)
 
     assistant_convo.append({'role': 'user', 'content': prompt})
 
-    do_search = search_or_not()
+    do_search = True #@@@@ search_or_not()
     while True:
         if do_search :
             context = ai_search()
