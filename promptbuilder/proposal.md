@@ -1,28 +1,53 @@
-Certainly! Here's the updated, copy-paste-friendly version of the **PromptBuilder proposal** for your convenience:
-
----
 
 ## 📦 Proposal: PromptBuilder — Structured AI Prompting for .NET Developers
 
 ### Overview
 
-**PromptBuilder** is a dual-language .NET library that enables developers to declaratively incorporate large language model (LLM) reasoning into their applications. It empowers both F# and C# developers to tap into LLMs for facts, structured data, and procedural logic—without having to hand-roll prompt orchestration or glue code.
+**PromptBuilder** is a structured, type-safe library for orchestrating large language model (LLM) prompts in .NET applications. It’s designed to help developers bridge two worlds:
 
-PromptBuilder is especially suited to problems developers face every day:
+- The *traditional world* of strongly typed functions, data models, and explicit APIs
+- The *new world* of semantic reasoning, flexible knowledge access, and fuzzy-but-useful AI interfaces
 
-> “How do I get structured data or context-aware insights into my application—without scraping sites or wiring up obscure APIs?”
+With PromptBuilder, developers can express intent like:
 
-Now, asking something like “Airports within 50 miles of Duvall, WA” can be done directly in your programming language—with type safety, traceability, and retry logic built in.
+> “Get me a list of airports within 50 miles of Duvall, WA.”
+
+…and receive structured, typed data—without standing up a geocoder, scraping sites, or integrating third-party APIs.
+
+This proposal outlines:
+- A shared C# core for prompt execution and response handling  
+- An idiomatic F# computation expression (`prompt {}`)  
+- A fluent C# builder (`PromptFlow`)  
+- Support for agent composition and memory-driven flows  
+- Real-world use cases and developer productivity gains  
 
 ---
 
 ### 🎯 Goals
 
-- Build a shared, testable .NET **core library** for executing and parsing prompts  
-- Offer an **idiomatic F# PromptBuilder** using computation expressions  
-- Provide a **C# fluent API** that follows conventional async and chaining patterns  
-- Support **agent-oriented composition** on top of prompts  
-- Enable developers to embed *AI as a world-aware, type-safe function call*
+- Enable developers to express high-level *semantic requests* with typed responses
+- Offer simple, reliable interfaces to integrate LLMs into .NET applications
+- Reduce complexity of retrieving, filtering, or shaping real-world knowledge
+- Build reusable prompting agents for test generation, analysis, or synthesis tasks
+- Leverage familiar .NET idioms (async, types, Option/Result, LINQ) rather than creating an entirely new developer experience
+
+---
+
+### 📈 Why Now — Lowering the Ceiling of Specialized Knowledge
+
+Traditionally, software has been limited by:
+- The APIs you knew existed
+- The data sources you had access to
+- The time you had to wire them up
+
+PromptBuilder flips that dynamic. Instead of pre-integrating 30 libraries to access knowledge, you can query the world *semantically*—and get structured answers shaped to your needs.
+
+This shifts programming from:
+- “Integrate the API that gives me airport data”
+to:
+- “Describe what I want, and parse the response”
+
+It’s not magic—it’s a new kind of plumbing between classical software and LLM-enabled cognition. PromptBuilder is the **bridge from code to intent**.
 
 ---
 
@@ -30,22 +55,25 @@ Now, asking something like “Airports within 50 miles of Duvall, WA” can be d
 
 ```
 PromptBuilder/
-├── PromptCore       # Shared C# logic for prompt execution
+├── PromptCore       # Shared logic
 │   ├── PromptRequest, PromptResponse
-│   ├── Json parsers, retry helpers
-│   └── IPromptRunner interface
+│   ├── IPromptRunner (pluggable backend)
+│   ├── Json schema parsing, retry helpers
 ├── PromptBuilder.FSharp
-│   └── prompt { ... } computation expression
-│   └── F# Option-based deserialization
+│   ├── Computation expression prompt { let! ... }
+│   ├── Safe Option-returning workflows
 ├── PromptBuilder.CSharp
-│   └── Fluent PromptFlow API
-└── PromptAgents     # Lightweight agent primitives (optional layer)
-    └── Agent<'Input, 'State, 'Output>
+│   ├── Fluent builder-style API (PromptFlow)
+└── PromptAgents     # Optional agent abstraction
+    ├── Agent<'Input, 'State, 'Output>
+    ├── Memory and chaining support
 ```
 
 ---
 
-### ✈️ F# Example
+### ✨ Developer Examples
+
+#### 📌 F# (PromptBuilder)
 
 ```fsharp
 type Airport = { name: string; iata: string; location: string }
@@ -62,14 +90,12 @@ prompt {
 )
 ```
 
----
-
-### 🧰 C# Example
+#### 📌 C# (PromptFlow)
 
 ```csharp
-var result = await PromptFlow
+var airports = await PromptFlow
     .WithPrompt("""
-        List airports within 50 miles of Duvall, WA.
+        List airports near Duvall, WA.
         Return as JSON: [{ "name": "...", "iata": "...", "location": "..." }]
     """)
     .Expecting<List<Airport>>()
@@ -81,43 +107,40 @@ var result = await PromptFlow
 
 ### 🤖 Agents on Top
 
+PromptBuilder makes it easy to compose agents—modular units that invoke prompts, manage memory, and return structured results.
+
 ```fsharp
 let airportAgent : Agent<string, unit, Airport list option> =
     fun (query, _) -> prompt {
-        let! raw = $"Find airports near {query}. Return JSON."
+        let! raw = $"Airports near {query}. Return JSON."
         return! Json.tryDeserialize<Airport list> raw
     }
 ```
 
-```csharp
-var agent = new PromptAgent<string, List<Airport>>()
-    .WithPrompt(query => $"Airports near {query} as JSON")
-    .Expecting<List<Airport>>();
-```
+This sets the stage for:
+- **Test harness agents** (“Summarize this schema violation”)
+- **Interactive CLI agents** (“Ask the user clarifying questions if ambiguous”)
+- **Memory-carrying flows** (“Remember previous context and build upon it”)
 
 ---
 
-### 🌍 Why This Matters
+### 🔍 Real Bottlenecks Solved
 
-Developers often struggle to access structured world knowledge programmatically. PromptBuilder makes AI-grounded, semantically flexible knowledge **available as a typed input** in everyday code—without scraping, API hunting, or brittle integrations. It’s about empowering familiar workflows, not reinventing them.
-
----
-
-### ✅ Use Cases
-
-- Test generation and schema synthesis  
-- Structured data retrieval (e.g., airports, embassies, regions)  
-- Code analysis and explanation tools  
-- CI pipelines that tag, summarize, or lint PRs  
-- Local agents that perform structured, self-contained tasks
+| Bottleneck                           | Traditional Fix                      | PromptBuilder Equivalent                        |
+|-------------------------------------|--------------------------------------|-------------------------------------------------|
+| Geospatial lookup                   | Install geocoder + lat/lon database  | Ask prompt and parse JSON list                 |
+| Schema-aware test generator         | Write domain-specific generator      | Prompt: “Give sample input for schema X”       |
+| Explain error message               | Write custom rule engine             | Prompt: “Explain this exception to a dev”      |
+| Translate domain-specific jargon    | Create glossary or rule parser       | Prompt: “Translate this contract to plain English” |
+| Classify user input into intent     | Train NLP classifier                 | Prompt: “What kind of request is this?”        |
 
 ---
 
-### 🛣️ Roadmap
+### 🛣 Roadmap
 
 | Phase | Deliverables |
 |-------|--------------|
-| v0.1  | Core prompt engine, JSON parsing, retry logic |
+| v0.1  | Core prompt engine, JSON parser, retry logic |
 | v0.2  | F# computation expression with builder |
 | v0.3  | C# fluent API (`PromptFlow`) |
 | v0.4  | Agent abstraction + chaining |
@@ -125,4 +148,10 @@ Developers often struggle to access structured world knowledge programmatically.
 
 ---
 
-Let me know if you’d like a matching README scaffold or a working stub for `PromptRunner.cs` and `PromptBuilder.fs`. I’d love to help you spin up the repo.
+### ✅ Summary
+
+PromptBuilder makes AI feel like a natural extension of .NET—typed, composable, familiar. It’s not about reinventing how you code; it’s about freeing you from needing to know everything in advance.
+
+Instead of asking developers to build tools to find facts, PromptBuilder lets them build tools that *ask for facts*, safely and fluently.
+
+When knowledge becomes code—typed and testable—the ceiling of creativity rises. PromptBuilder helps developers get there.
