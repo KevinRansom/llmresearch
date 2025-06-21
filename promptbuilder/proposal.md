@@ -124,15 +124,129 @@ This sets the stage for:
 
 ---
 
-### 🔍 Real Bottlenecks Solved
+### 🧰 Classic Developer Bottlenecks — Reimagined with PromptBuilder
 
-| Bottleneck                           | Traditional Fix                      | PromptBuilder Equivalent                        |
-|-------------------------------------|--------------------------------------|-------------------------------------------------|
-| Geospatial lookup                   | Install geocoder + lat/lon database  | Ask prompt and parse JSON list                 |
-| Schema-aware test generator         | Write domain-specific generator      | Prompt: “Give sample input for schema X”       |
-| Explain error message               | Write custom rule engine             | Prompt: “Explain this exception to a dev”      |
-| Translate domain-specific jargon    | Create glossary or rule parser       | Prompt: “Translate this contract to plain English” |
-| Classify user input into intent     | Train NLP classifier                 | Prompt: “What kind of request is this?”        |
+PromptBuilder empowers developers to solve previously tedious or specialized tasks using succinct, structured prompts—often in just a few lines of code. Here’s a collection of common bottlenecks that are now drastically simplified:
+
+| Problem                                    | Traditional Fix                                | PromptBuilder Equivalent                                             |
+|-------------------------------------------|------------------------------------------------|----------------------------------------------------------------------|
+| **Generate edge-case inputs**             | Write test harnesses or property-based fuzzing | Prompt: “Give 5 inputs that break this regex: `^[a-z]{3,6}$`”        |
+| **Create test data from a schema**        | Use a JSON schema validator or handcraft data  | Prompt: “Generate a valid sample for this JSON schema”              |
+| **Explain an exception**                  | Lookup stack trace or dig through docs         | Prompt: “Explain this error message for a C# developer”             |
+| **Summarize structured change logs**      | Write regex parsers or git hooks               | Prompt: “Summarize these commits into user-friendly changelog bullets” |
+| **Translate technical jargon**            | Build glossary or separate rule engine         | Prompt: “Translate this contract into plain English”                |
+| **Suggest field names for JSON keys**     | Guess manually or consult domain experts       | Prompt: “What’s a good name for these fields: `['n1', 'n2', 'n3']`?” |
+| **Describe image contents (F# only)**     | Integrate CV model or upload to cloud          | Prompt: “Describe this image in JSON with fields: object, location” |
+| **Classify intent from free text**        | Train ML/NLP classifier                        | Prompt: “Classify this into one of: support, sales, feedback”       |
+| **Design a valid regex from description** | Use Regex101 or trial & error                  | Prompt: “Write a regex to extract emails from this text”            |
+| **Generate mock database rows**           | Use test factories                             | Prompt: “Create 3 example rows for this SQL table schema”           |
+| **Summarize legal/policy text**           | Skim and manually paraphrase                   | Prompt: “Summarize this paragraph in 2 simple bullet points”        |
+
+These scenarios can be implemented as simple reusable agents or prompt snippets and offer huge leverage for scripting, analysis, or developer experience tooling.
+
+---
+
+### 🧪 Edge Case Input Generator (F#)
+
+```fsharp
+prompt {
+    let! raw = "Generate 5 inputs that break this regex: ^[a-z]{3,6}$"
+    return! Json.tryDeserialize<string list> raw
+}
+|> Option.iter (List.iter (printfn "🚫 %s"))
+```
+
+**Why F#:** Lightweight pattern matching and functional pipelines make this a one-liner for fuzz testing or edge detection.
+
+---
+
+### 📐 Schema-Based Sample Generator (C#)
+
+```csharp
+string schema = """
+{
+  "type": "object",
+  "properties": {
+    "email": { "type": "string", "format": "email" },
+    "age": { "type": "integer", "minimum": 18 }
+  }
+}
+""";
+
+var sample = await PromptFlow
+    .WithPrompt($"Generate one valid JSON object for this schema:\n{schema}")
+    .Expecting<JsonDocument>()
+    .RunAsync();
+```
+
+**Why C#:** Fluent API enables embedded schemas and full IntelliSense support with rich deserialization.
+
+---
+
+### 📄 Explain an Exception Message (F#)
+
+```fsharp
+let explainError (ex: exn) =
+    prompt {
+        return! $"Explain this .NET exception for a junior developer:\n{ex.Message}"
+    }
+```
+
+**Why F#:** Perfect for scripting REPL flows or integrating into IDE tools with minimal surface area.
+
+---
+
+### 📚 Classify User Input into Intent (C#)
+
+```csharp
+string message = "Hi, I’m wondering about your pricing tiers.";
+
+var intent = await PromptFlow
+    .WithPrompt($"""
+        Classify the following input as one of: support, sales, feedback.
+        Input: "{message}"
+    """)
+    .Expecting<string>()
+    .RunAsync();
+```
+
+**Why C#:** Great for business logic, routing, and server-side use where you want clear class-based structure.
+
+---
+
+### 🧪 Generate Test Cases from Function Signature (F#)
+
+```fsharp
+let fnSig = "int Add(int a, int b) returns int"
+
+prompt {
+    let! raw = $"Create 5 test cases for this function signature: {fnSig}"
+    return! Json.tryDeserialize<{| input: int * int; output: int |} list> raw
+}
+```
+
+**Why F#:** Algebraic types make it easy to model function contracts and validate test case coverage.
+
+---
+
+### 🧾 Summarize Git Commits (C#)
+
+```csharp
+var commits = """
+- 4f3e112 fix: null ref in login handler
+- b792c44 feat: add localization
+- da82d21 chore: update mobile layout
+""";
+
+var changelog = await PromptFlow
+    .WithPrompt($"""
+        Turn the following commits into changelog bullets:\n{commits}
+    """)
+    .Expecting<string>()
+    .RunAsync();
+```
+
+**Why C#:** Easy to embed in CI/CD pipelines or devops scripts with minimal integration effort.
 
 ---
 
