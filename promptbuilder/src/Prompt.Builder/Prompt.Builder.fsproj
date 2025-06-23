@@ -1,18 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Program.fs" />
-    <Compile Include="src\Builder.fs" />
-    <Compile Include="src\Core.fs" />
+    <Compile Include="Library.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="src\Test.fsx" />
+    <ProjectReference Include="..\Prompt.Core\Prompt.Core.csproj" />
   </ItemGroup>
 
 </Project>
