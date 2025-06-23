@@ -1,0 +1,7 @@
+**/.data/*
+**/.vs/*
+**/__pycache__/*
+**/obj/*
+**/bin/*
+*.bak
+.fake
