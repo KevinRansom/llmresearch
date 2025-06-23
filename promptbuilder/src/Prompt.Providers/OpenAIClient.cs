@@ -2,8 +2,9 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Prompt.Core;
 
-namespace Prompt.Core;
+namespace Prompt.Providers;
 
 public class OpenAIClient : IPromptRunner
 {
@@ -23,12 +24,12 @@ public class OpenAIClient : IPromptRunner
         var payload = new
         {
             model = _model,
-            messages = new[] { new { role = "user", content = request.PromptText } },
+            messages = new[] { new { role = ""user"", content = request.PromptText } },
             temperature = request.Temperature
         };
 
-        using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
-        req.Headers.Add("Authorization", $"Bearer {_apiKey}");
+        using var req = new HttpRequestMessage(HttpMethod.Post, ""https://api.openai.com/v1/chat/completions"");
+        req.Headers.Add(""Authorization"", $""Bearer {_apiKey}"");
         req.Content = JsonContent.Create(payload);
 
         var res = await _http.SendAsync(req);
@@ -37,9 +38,9 @@ public class OpenAIClient : IPromptRunner
         var json = await res.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement
-                  .GetProperty("choices")[0]
-                  .GetProperty("message")
-                  .GetProperty("content")
-                  .GetString() ?? string.Empty;
+                  .GetProperty(""choices"")[0]
+                  .GetProperty(""message"")
+                  .GetProperty(""content"")
+                  .GetString() ?? """";
     }
 }
