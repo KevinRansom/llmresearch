@@ -6,7 +6,7 @@ namespace Prompt.Flow;
 
 public class PromptFlow<T>
 {
-    private string _prompt = """";
+    private string _prompt = "";
     private Func<string, T?> _parser = _ => default!;
     private IPromptRunner _runner;
     private int _retryCount = 0;

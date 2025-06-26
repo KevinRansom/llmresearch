@@ -5,8 +5,17 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <PackageId>Codecutter.Prompt.Providers.0.0.00.000-initial</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Kevin Ransom</Authors>
+    <Company>Codecutter</Company>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Compile Include="Library.fs" />
+    <Compile Include="Builder.fs" />
+    <Compile Include="PromptBuilder.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,17 +1,14 @@
 namespace Prompt.Builder
 
-open System.Net.Http
-open Prompt.Core
+    open System.Threading.Tasks
+    open Prompt.Core
 
-type PromptBuilder() =
-    member _.Bind(prompt: string, next: string -> Async<'T option>) =
-        async {
-            let client = OpenAIClient(HttpClient(), ""<your-key>"")
-            let! raw = client.RunAsync(PromptRequest(prompt)) |> Async.AwaitTask
-            return! next raw
-        }
+    type PromptBuilder(runner: IPromptRunner) =
+        member _.Bind(prompt: string, next: string -> Task<'T>) =
+            task {
+                let! raw = runner.RunAsync(PromptRequest(prompt))
+                return! next raw
+            }
 
-    member _.Return(x) = async { return Some x }
-    member _.ReturnFrom(x) = x
-
-let prompt = PromptBuilder()
+        member _.Return(x) = Task.FromResult(Some x)
+        member _.ReturnFrom(x: Task<'T>) = x
