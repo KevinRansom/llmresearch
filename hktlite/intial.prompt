@@ -1,0 +1,66 @@
+Absolutely! Here's a detailed and structured prompt you can feed directly into GitHub Copilot (or paste at the top of a file or comment block) to give it the full context of our "HKT-lite via attributes" approach in F#:
+
+---
+
+```fsharp
+/// GOAL: Prototype a lightweight HKT-style abstraction in F#
+///       using attributes and explicit modules—no SRTPs or kinded types.
+///
+/// DESIGN PHILOSOPHY:
+/// - Avoid static member constraints (SRTPs) due to complexity and poor dev ergonomics
+/// - Avoid typeclasses / full HKTs (F# lacks kind-polymorphism)
+/// - Use attributes like [<Functor>] or [<Applicative>] to mark modules that implement known "laws"
+/// - Structure reusable behavior as functions or records grouped in modules
+/// - Use analyzers (or later, compiler extension) to validate conformity to expected signatures
+///
+/// EXAMPLE: A [<Functor>] module must define:
+///     map : ('T -> 'U) -> F<'T> -> F<'U>
+///
+/// SCOPE:
+/// ? Attribute-based declaration of abstract behaviors
+/// ? Explicit module per instance (e.g., ListFunctor, OptionFunctor)
+/// ? Shared usage API via passed-in modules or dictionaries
+/// ?? No automatic resolution or inference (developer explicitly selects module)
+/// ? No compiler inference of type constructors (* ? * kind)
+///
+/// GUIDING CODE STRUCTURE:
+///
+/// Attributes (declarative markers):
+[<AttributeUsage(AttributeTargets.Module, AllowMultiple = false)>]
+type FunctorAttribute() = inherit System.Attribute()
+
+[<AttributeUsage(AttributeTargets.Module, AllowMultiple = false)>]
+type ApplicativeAttribute() = inherit System.Attribute()
+
+/// Sample instance module — conforms to [<Functor>]
+[<Functor>]
+module ListFunctor =
+    let map f xs = List.map f xs
+
+/// Usage site
+let incrementList = ListFunctor.map ((+) 1)
+
+/// Optional registry-style pattern (manual):
+module Functors =
+    let list = { new IFunctor<_> with member _.Map f xs = List.map f xs }
+
+/// Interface (if needed) to wrap behavior
+type IFunctor<'F> =
+    abstract Map<'T,'U> : ('T -> 'U) -> 'F -> 'F
+
+/// === OUT OF SCOPE ===
+/// - Kind checking
+/// - Automatic inference / resolution
+/// - SRTP-based constraints
+/// - Full-on category theory
+
+/// TODOs for Copilot:
+/// - Help scaffold functor modules for Option, Result, etc.
+/// - Validate that `map` signatures match expected form
+/// - Help wire up `map2` and Applicative-style abstractions
+/// - Suggest ergonomic API for invoking and composing these behaviors
+```
+
+---
+
+This context will help GitHub Copilot understand you're building a **modular, attribute-based approximation of HKTs** in F#, favoring **explicitness and tooling over type-level wizardry**. It’s enough structure to help it scaffold instance modules, suggest compatible signatures, and avoid offering SRTPs as a default.
