@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Prompt.Core\Prompt.Core.csproj" />
+    <ProjectReference Include="..\Prompt.Providers\Prompt.Providers.csproj" />
   </ItemGroup>
 
 </Project>

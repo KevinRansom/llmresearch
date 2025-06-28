@@ -11,7 +11,10 @@ public class OllamaClient : IPromptRunner
     private readonly HttpClient _http;
     private readonly string _model;
 
-    public OllamaClient(HttpClient http, string model = "llama3")
+    public static OllamaClient llama_31_8b = new OllamaClient(new HttpClient(), "llama3.1:8b");
+    public static OllamaClient gemma3_12b = new OllamaClient(new HttpClient(), "gemma3:12b");
+
+    public OllamaClient(HttpClient http, string model = "llama3.1:8b")
     {
         _http = http;
         _model = model;
