@@ -2,9 +2,8 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Prompt.Core;
 
-namespace Prompt.Providers;
+namespace ModelWeave.Core;
 
 public class OpenAIClient : IPromptRunner
 {
@@ -41,6 +40,6 @@ public class OpenAIClient : IPromptRunner
                   .GetProperty("choices")[0]
                   .GetProperty("message")
                   .GetProperty("content")
-                  .GetString() ?? "";
+                  .GetString() ?? string.Empty;
     }
 }

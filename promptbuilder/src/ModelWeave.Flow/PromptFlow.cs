@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
-using Prompt.Core;
+using ModelWeave.Core;
 
-namespace Prompt.Flow;
+namespace ModelWeave.Flow;
 
 public class PromptFlow<T>
 {

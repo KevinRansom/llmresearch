@@ -2,9 +2,9 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Prompt.Core;
+using ModelWeave.Core;
 
-namespace Prompt.Providers;
+namespace ModelWeave.Providers;
 
 public class LMStudioClient : IPromptRunner
 {

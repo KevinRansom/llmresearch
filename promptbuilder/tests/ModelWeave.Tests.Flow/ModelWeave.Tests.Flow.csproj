@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -19,7 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Prompt.Providers\Prompt.Providers.fsproj" />
+    <ProjectReference Include="..\..\src\ModelWeave.Flow\ModelWeave.Flow.csproj" />
+    <ProjectReference Include="..\..\src\ModelWeave.Core\ModelWeave.Core.csproj" />
+    <ProjectReference Include="..\..\src\ModelWeave.Providers\ModelWeave.Providers.csproj" />
   </ItemGroup>
 
 </Project>

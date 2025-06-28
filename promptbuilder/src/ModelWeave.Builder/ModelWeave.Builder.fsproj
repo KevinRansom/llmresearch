@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageId>Codecutter.Prompt.Providers.0.0.00.000-initial</PackageId>
+    <PackageId>Codecutter.ModelWeave</PackageId>
     <Version>1.0.0</Version>
     <Authors>Kevin Ransom</Authors>
     <Company>Codecutter</Company>
@@ -14,13 +14,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Builder.fs" />
+    <Compile Include="Prompt.fs" />
     <Compile Include="PromptBuilder.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Prompt.Core\Prompt.Core.csproj" />
-    <ProjectReference Include="..\Prompt.Providers\Prompt.Providers.csproj" />
+    <ProjectReference Include="..\ModelWeave.Core\ModelWeave.Core.csproj" />
+    <ProjectReference Include="..\ModelWeave.Providers\ModelWeave.Providers.csproj" />
   </ItemGroup>
 
 </Project>

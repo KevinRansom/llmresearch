@@ -11,16 +11,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Prompt.Core\Prompt.Core.csproj" />
-    <ProjectReference Include="..\..\src\Prompt.Builder\Prompt.Builder.fsproj" />
-    <ProjectReference Include="..\..\src\Prompt.Providers\Prompt.Providers.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ModelWeave.Builder\ModelWeave.Builder.fsproj" />
+    <ProjectReference Include="..\..\src\ModelWeave.Core\ModelWeave.Core.csproj" />
+    <ProjectReference Include="..\..\src\ModelWeave.Providers\ModelWeave.Providers.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,4 @@
-﻿namespace Prompt.Tests.Flow;
+﻿namespace ModelWeave.Tests.Core;
 
 public class UnitTest1
 {

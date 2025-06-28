@@ -15,11 +15,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Xunit" />
+    <ProjectReference Include="..\..\src\ModelWeave.Core\ModelWeave.Core.csproj" />
+    <ProjectReference Include="..\..\src\ModelWeave.Providers\ModelWeave.Providers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Prompt.Core\Prompt.Core.csproj" />
+    <Using Include="Xunit" />
   </ItemGroup>
 
 </Project>

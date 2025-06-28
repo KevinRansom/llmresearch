@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Prompt.Core;
+namespace ModelWeave.Core;
 
 public interface IPromptRunner
 {

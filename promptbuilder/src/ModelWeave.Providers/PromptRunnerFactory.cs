@@ -1,8 +1,8 @@
 using System;
 using System.Net.Http;
-using Prompt.Core;
+using ModelWeave.Core;
 
-namespace Prompt.Providers;
+namespace ModelWeave.Providers;
 
 public static class PromptRunnerFactory
 {

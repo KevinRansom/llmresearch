@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Prompt.Core;
+namespace ModelWeave.Core;
 
 public static class Json
 {
