@@ -20,7 +20,6 @@ module SmokeTests =
         let workflow =
             prompt {
                 let! response = "List the major London Airports by name, provide their postal addresses and main switchboard telephone number"
-                // Here you could add deserialization, e.g. return! Json.tryDeserialize<Library list> response
                 return response
             }
 
@@ -28,7 +27,7 @@ module SmokeTests =
         workflow
         |> executePrompt
         |> function
-           | Some result -> printfn "Prompt result: %s" result
+           | Some result -> printfn "Prompt result: %A" result
            | None -> printfn "Prompt failed."
 
     [<Fact>]
@@ -38,8 +37,7 @@ module SmokeTests =
 
         let workflow =
             prompt {
-                let! response = withSignature<string> "Which Egyptian King is buried in the Great Pyramid at Giza"
-                // Here you could add deserialization, e.g. return! Json.tryDeserialize<Library list> response
+                let! response = ask<string> "Which Egyptian King is buried in the Great Pyramid at Giza"
                 return response
             }
 
@@ -48,6 +46,25 @@ module SmokeTests =
         |> Async.AwaitTask
         |> Async.RunSynchronously
         |> function
-           | Some result -> printfn "Prompt result: %s" result
+           | Some result -> printfn "Prompt result: %A" result
            | None -> printfn "Prompt failed."
+
+    [<Fact>]
+    /// Prompt Returns Tuple
+    let ``Prompt Returns Tuple`` () =
+        let prompt = PromptBuilder(OllamaClient.llama_31_8b)            // Use the static instance of OllamaClient for llama_31_8b
+
+        let workflow =
+            prompt {
+                let! response = ask<(string * int * bool)> "Which Egyptian King built the Great Pyramid, when was it completed, and is it open to tourists?"
+                return response
+            }
+
+        // Run the workflow and print the result
+        workflow
+        |> Async.AwaitTask
+        |> Async.RunSynchronously
+        |> function
+           | Some result -> printfn "Prompt result: %A" result
+           | None -> failwith "Prompt failed."
 

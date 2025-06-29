@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModelWeave.Tests.Flow", "te
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ModelWeave.Tests.Providers", "tests\ModelWeave.Tests.Providers\ModelWeave.Tests.Providers.fsproj", "{3E24943C-8C2B-37FD-3FEE-EFD9CEEA00BC}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ModelWeave.Assertions", "tests\ModelWeave.Assertions\ModelWeave.Assertions.fsproj", "{397068D9-38DB-0CA6-8250-2C2677745D92}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -129,6 +131,18 @@ Global
 		{3E24943C-8C2B-37FD-3FEE-EFD9CEEA00BC}.Release|x64.Build.0 = Release|Any CPU
 		{3E24943C-8C2B-37FD-3FEE-EFD9CEEA00BC}.Release|x86.ActiveCfg = Release|Any CPU
 		{3E24943C-8C2B-37FD-3FEE-EFD9CEEA00BC}.Release|x86.Build.0 = Release|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Debug|x64.Build.0 = Debug|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Debug|x86.Build.0 = Debug|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Release|Any CPU.Build.0 = Release|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Release|x64.ActiveCfg = Release|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Release|x64.Build.0 = Release|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Release|x86.ActiveCfg = Release|Any CPU
+		{397068D9-38DB-0CA6-8250-2C2677745D92}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -142,6 +156,7 @@ Global
 		{F4D42556-15C0-7699-E9C6-630FAFCC7DA6} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{C30F3BD6-CB62-DDCE-8164-239BD4EC4B84} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{3E24943C-8C2B-37FD-3FEE-EFD9CEEA00BC} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{397068D9-38DB-0CA6-8250-2C2677745D92} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F383DF96-C7E6-4210-9397-2C3C5C727174}
