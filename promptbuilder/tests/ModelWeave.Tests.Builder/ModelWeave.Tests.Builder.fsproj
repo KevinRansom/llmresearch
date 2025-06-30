@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\ModelWeave.Builder\ModelWeave.Builder.fsproj" />
     <ProjectReference Include="..\..\src\ModelWeave.Core\ModelWeave.Core.csproj" />
     <ProjectReference Include="..\..\src\ModelWeave.Providers\ModelWeave.Providers.csproj" />
+    <ProjectReference Include="..\ModelWeave.Assertions\ModelWeave.Tests.Assertions.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

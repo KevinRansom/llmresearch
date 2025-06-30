@@ -1,6 +1,7 @@
 ﻿namespace ModelWeave.Tests.Builder
 
 open Xunit
+open ModelWeave.Tests.Assertions
 open ModelWeave.Providers
 open ModelWeave.Builders
 
@@ -25,13 +26,10 @@ module SmokeTests =
 
         // Run the workflow and print the result
         workflow
-        |> executePrompt
-        |> function
-           | Some result -> printfn "Prompt result: %A" result
-           | None -> printfn "Prompt failed."
+        |> expect (fun _name -> ())
 
-    [<Fact>]
     /// Prompt Returns single String
+    [<Fact>]
     let ``Prompt Returns single String`` () =
         let prompt = PromptBuilder(OllamaClient.llama_31_8b)            // Use the static instance of OllamaClient for llama_31_8b
 
@@ -43,11 +41,7 @@ module SmokeTests =
 
         // Run the workflow and print the result
         workflow
-        |> Async.AwaitTask
-        |> Async.RunSynchronously
-        |> function
-           | Some result -> printfn "Prompt result: %A" result
-           | None -> printfn "Prompt failed."
+        |> expect (fun name -> Assert.StartsWith("Kh", name))
 
     [<Fact>]
     /// Prompt Returns Tuple

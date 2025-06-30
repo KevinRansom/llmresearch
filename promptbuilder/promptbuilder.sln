@@ -23,7 +23,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModelWeave.Tests.Flow", "te
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ModelWeave.Tests.Providers", "tests\ModelWeave.Tests.Providers\ModelWeave.Tests.Providers.fsproj", "{3E24943C-8C2B-37FD-3FEE-EFD9CEEA00BC}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ModelWeave.Assertions", "tests\ModelWeave.Assertions\ModelWeave.Assertions.fsproj", "{397068D9-38DB-0CA6-8250-2C2677745D92}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ModelWeave.Tests.Assertions", "tests\ModelWeave.Assertions\ModelWeave.Tests.Assertions.fsproj", "{397068D9-38DB-0CA6-8250-2C2677745D92}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
