@@ -1,6 +1,3 @@
-Absolutely, Kevin — here’s the fully cleaned version, stripped of emojis and special characters, with pure Markdown headers for maximum compatibility:
-
-```markdown
 # Building Agent Memory Without Surveillance  
 *A Model-Agnostic Architecture for Ethical, Token-Efficient Agent Memory*
 
@@ -81,6 +78,3 @@ Contrary to proposals advocating indefinite transcript retention, SummaryLedger 
 
 ## Conclusion  
 SummaryLedger combines recursive summarization, user supervision, and natural memory entropy to form an ethical, effective memory layer for stateless agents. It scales with conversation, preserves privacy, and invites a user-guided future for agentic cognition.
-```
-
-Ready to drop directly into your repo—no surprises, no rendering issues. Let me know if you'd like a diagram scaffold next or help linking this into the core ModelWeave README flow.
