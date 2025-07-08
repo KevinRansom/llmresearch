@@ -1,6 +1,6 @@
 # MCP Module Spec: MemoryTool
 
-Below is an updated specification for a Model Control Protocol (MCP) module that exposes session memory as a tool. You can drop this into Gemma’s `.mcp/modules` folder and use GitHub Copilot to flesh out the implementation.
+This specification defines a Model Control Protocol (MCP) module that exposes session memory as an invocable tool. Designed for compatibility with Gemma’s `.mcp/modules` discovery mechanism, it supports structured recall operations that return context summaries and traceability metadata.
 
 ---
 
@@ -27,16 +27,17 @@ Below is an updated specification for a Model Control Protocol (MCP) module that
         "type": "object",
         "properties": {
           "summary": { "type": "string" },
-          "confidence": { "type": "number" },
+          "confidence": { "type": ["number", "null"] },
           "source_refs": {
             "type": "array",
             "items": { "type": "string" }
           }
         },
-        "required": ["summary", "confidence"]
+        "required": ["summary"]
       }
     }
-  ]
+  ],
+  "schema_version": "1.0"
 }
 ```
 
@@ -46,8 +47,9 @@ Below is an updated specification for a Model Control Protocol (MCP) module that
 
 ```csharp
 using System;
+using System.Threading;
 using System.Threading.Tasks;
-using ModelControl.Protocol;   // hypothetical MCP namespace
+using ModelControl.Protocol;
 
 namespace ModelWeave.Memory
 {
@@ -55,13 +57,13 @@ namespace ModelWeave.Memory
     {
         public ModuleManifest Manifest => ModuleManifest.Load("memory-tool.module.json");
 
-        public async Task<CommandResult> InvokeAsync(CommandInvocation invocation)
+        public async Task<CommandResult> InvokeAsync(CommandInvocation invocation, CancellationToken cancellationToken = default)
         {
             if (invocation.Name != "recall_memory")
                 throw new InvalidOperationException($"Unsupported command: {invocation.Name}");
 
             var query = invocation.Arguments.GetString("query");
-            var (summary, confidence, refs) = await MemoryStore.FetchAsync(query);
+            var (summary, confidence, refs) = await MemoryStore.FetchAsync(query, cancellationToken);
 
             return new CommandResult
             {
@@ -87,24 +89,26 @@ namespace ModelWeave.Memory
    ?? com.modelweave.memory/
       ?? memory-tool.module.json
       ?? ModelWeave.Memory.dll
+      ?? docs/
+      ?   ?? usage.md
+      ?? samples/
+          ?? test_invocation.json
 ```
 
 ---
 
 ## 4. Host Integration Steps
 
-1.  **Module Discovery**  
-    On startup, Gemma scans `.mcp/modules/*/memory-tool.module.json`.
+1. **Module Discovery**  
+   On startup, the LLM scans all `.mcp/modules/*/memory-tool.module.json` files to enumerate available MCP modules.
 
-2.  **Tool Registration**  
-    It reads the `commands` array and adds each to the LLM’s tool list in the system prompt.
+2. **Tool Registration**  
+   It parses the `commands` block and incorporates each tool into the system prompt for tool-calling LLMs.
 
-3.  **Invocation Handling**  
-    When the LLM emits a `tool_call` for `recall_memory`, Gemma routes it to `MemoryModule.InvokeAsync()`.
+3. **Invocation Handling**  
+   When the model emits a `tool_call` for `recall_memory`, Gemma dispatches it to `MemoryModule.InvokeAsync()`.
 
-4.  **Context Injection**  
-    Gemma appends the `summary` result as an assistant message, then resumes the conversation.
+4. **Context Injection**  
+   On successful completion, the LLM appends the `summary` to the assistant message stream and continues the session. If the call fails, fallback behavior (no-op, retry, or omission) must be handled gracefully by the host runtime.
 
----
-
-You now have a correct MCP (Model Control Protocol) spec. Open these files in your .NET project, fire up GitHub Copilot, and let it generate the supporting classes (`MemoryStore`, JSON (de)serialization, error handling) to complete the module.
+Drafted by Kevin, annotated by Gemma, assembled by Copilot (Dood by nature, Copilot by name).
