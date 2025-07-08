@@ -14,35 +14,35 @@ We propose a model-agnostic memory layer—SummaryLedger—that uses iterative summa
   Configurable token limit ensures the summary remains usable within the model’s context window. Low-signal details decay unless reaffirmed.
 
 - Editable Memory Interface  
-  The summary is fully inspectable and user-editable. Users may revise phrasing, prune irrelevant content, or tag segments as essential, ephemeral, or instructional.
+  The summary is fully inspectable and user-editable. Users may revise phrasing, prune irrelevant content, or tag segments as essential, ephemeral, or instructional. This interface may surface in the host environment as a plain-text or markdown buffer, and should support revision tracking.
 
 ### Recursive Prompt Loop  
-1. User submits Prompt?  
-2. LLM generates Answer? based on (Prompt? + Summary???)  
-3. LLM produces Summary? = Summarize(Summary??? + Prompt? + Answer?)  
-4. Replace the current memory artifact with Summary?  
-5. Next turn uses Summary? + Prompt??? as input
+1. User submits Prompt  
+2. LLM generates Answer based on (Prompt + Summary)  
+3. LLM produces new Summary = Summarize(Summary + Prompt + Answer)  
+4. Replace the current memory artifact with updated Summary  
+5. Next turn uses Summary + next Prompt as input
 
 ## Shared Memory Interface: Sidebar Summaries  
 Exposing the evolving summary as a sidebar element transforms it into a living, co-authored artifact—benefiting both user and agent.
 
 - Mutual Artifact  
-  The summary is visible to the user, not hidden for the model alone. It becomes a shared reference point.
+  The summary is visible to the user, not hidden for the model alone. It becomes a shared reference point across turns.
 
 - Instant Session Resumption  
   With all salient points at a glance, users can restart or hand off the conversation without retracing every turn.
 
 - Editable and Exportable  
-  Sidebar controls let users correct drift, prune content, or export the summary for documentation or onboarding other models.
+  Sidebar controls let users correct drift, prune content, or export the summary for documentation or onboarding other agents.
 
 - Trust and Transparency  
-  Seeing exactly what’s remembered reinforces privacy assurances and invites collaborative refinement.
+  Seeing exactly what’s remembered reinforces privacy assurances and invites collaborative refinement. This aids GDPR alignment and fosters auditability by design.
 
 ## Why It’s Useful  
 - Extended Effective Context: Summary compression preserves salient history while maximizing token space for reasoning  
 - Natural Memory Decay: Irrelevant or old details phase out unless reasserted by user context  
 - Reduced Drift: Tight separation of memory and response logic preserves conversational fidelity  
-- User Trust and Safety: Memory is transparent, editable, and governed by user intent  
+- User Trust and Safety: Memory is transparent, editable, and governed by user intent
 
 ## Advantages Over Other Approaches  
 
@@ -58,11 +58,13 @@ Exposing the evolving summary as a sidebar element transforms it into a living, 
 - Lightweight Integration: Implemented entirely via prompt chaining  
 - Open Source Ready: Easily embedded in agent loops (e.g. Gemma 3-27B on Ollama)  
 - Token Efficient: Increases usable dialogue length while preserving semantic continuity  
+- Supports Structured Memory Retrieval: Enables tool invocation (e.g. `recall_memory`) to fetch relevant summary excerpts for continuity
 
 ## Strategic Opportunity for Large LLM Platforms  
 - Ethical Differentiation: Builds memory through consent, not surveillance  
 - Enterprise Appeal: Transparency and user agency improve compliance posture  
 - Scalable Philosophy: Works across models, providers, and deployment contexts  
+- Modular Backends: Pairs easily with vector search, audit logs, or ledger-style summaries without altering agent behavior
 
 ## Privacy and Regulatory Manifesto  
 SummaryLedger is designed as a privacy-first memory system. We believe AI agents should reflect cognitive consent, not passive accumulation.
@@ -71,10 +73,14 @@ SummaryLedger is designed as a privacy-first memory system. We believe AI agents
 - User-Curated Memory: The agent remembers only what the user chooses to retain  
 - Contextual Forgetting: Conversations fade unless explicitly reasserted or summarized  
 - GDPR Alignment: Compatible with rights to inspect, delete, and minimize retained data  
-- Auditability by Design: The memory artifact is fully inspectable and correctable by the user  
+- Auditability by Design: The memory artifact is fully inspectable and correctable by the user
 
 ### Context  
 Contrary to proposals advocating indefinite transcript retention, SummaryLedger respects human-like memory decay and user control. It avoids the surveillance aesthetic and builds trust—crucial for personal, enterprise, and international adoption.
 
 ## Conclusion  
 SummaryLedger combines recursive summarization, user supervision, and natural memory entropy to form an ethical, effective memory layer for stateless agents. It scales with conversation, preserves privacy, and invites a user-guided future for agentic cognition.
+
+---
+
+_Drafted by Kevin, annotated by Gemma, assembled by Copilot (Dood by nature, Copilot by name)._
