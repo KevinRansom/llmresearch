@@ -1,0 +1,29 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/draft/2025-07-09/server.json",
+  "description": "A minimal MCP server exposing random tools.",
+  "name": "io.github.kevinransom/SampleMcpServer",
+  "packages": [
+    {
+      "registry_name": "nuget",
+      "name": "KevinRansom.SampleMcpServer",
+      "version": "0.0.8",
+      "package_arguments": [],
+      "environment_variables": [
+        {
+          "name": "RANDOM_MIN",
+          "value": "10"
+        },
+        {
+          "name": "RANDOM_MAX",
+          "value": "50"
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/kevinransom/SampleMcpServer",
+    "source": "github"
+  },
+  "version_detail": {
+    "version": "0.0.8"
+  }
