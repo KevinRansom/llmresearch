@@ -1,79 +1,113 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Server;
+using SampleMcpServer;
 using System.Reflection;
+using System.Text.Json;
 
-public class Program
+
+var stdoutputLog = new StreamWriter("mcp_stdoutput.log") { AutoFlush = true };
+var stderrorLog = new StreamWriter("mcp_stderror.log") { AutoFlush = true };
+Console.SetOut(new TeeStream(Console.Out, stdoutputLog));
+Console.SetError(new TeeStream(Console.Error, stderrorLog));
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// Configure all logs to go to stderr (stdout is used for the MCP protocol messages).
+builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
+
+// Add the MCP services: the transport to use (stdio) and the tools to register.
+builder.Services
+    .AddMcpServer()
+//    .WithStdioServerTransport()
+    .WithCustomServerTransport(new StreamServerTransport(
+        new CancellableStdinStream(Console.OpenStandardInput()),
+        new BufferedStream(tee),
+        "SampleMcpServer",
+        loggerFactory));
+    .WithTools<RandomNumberTools>();
+
+McpToolManifestLogger.DumpRegisteredTools();
+
+await builder.Build().RunAsync();
+public static class McpToolManifestLogger
 {
-    public static async void Main(string[] args)
+    public static void DumpRegisteredTools(string logPath = "registeredTools.log", string jsonPath = "toolManifest.json")
     {
-        var builder = Host.CreateApplicationBuilder(args);
-
-        // Configure all logs to go to stderr (stdout is used for the MCP protocol messages).
-        builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
-
-        // Add the MCP services: the transport to use (stdio) and the tools to register.
-        builder.Services
-            .AddMcpServer()
-            .WithStdioServerTransport()
-            .WithTools<RandomNumberTools>();
-
-        //McpToolEnumerator.DumpRegisteredTools();
-
-        await builder.Build().RunAsync();
-    }
-}
-
-public static class McpToolEnumerator
-{
-    public static void DumpRegisteredTools()
-    {
-        static void WriteLogMessage(string message)
+        void Log(string message)
         {
-            File.AppendAllLines(@"c:\Temp\logfile.fil.txt", [message]);
+            File.AppendAllLines(logPath, new[] { $"{DateTime.UtcNow:u} - {message}" });
         }
 
-        var toolMap = new Dictionary<string, string>();
-        WriteLogMessage("=== MCP Tool Enumeration ===");
-        WriteLogMessage($"Assemblies: {AppDomain.CurrentDomain.GetAssemblies().Length}");
+        var manifest = new List<object>();
 
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        try
         {
-            WriteLogMessage($"Assembly: {assembly.Location}");
-            Type[] types;
-            try
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
-                types = assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types.Where(t => t != null).ToArray();
-            }
+                var asmName = asm.GetName().Name;
+                Log($"🔍 Scanning assembly: {asmName}");
 
-            foreach (var type in types)
-            {
-                WriteLogMessage($"Type: {type.AssemblyQualifiedName}");
-                if (!type.IsPublic || !type.IsClass) continue;
+                if (!asmName.Equals("SampleMcpServer", StringComparison.OrdinalIgnoreCase))
+                    continue;
 
-                foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                foreach (var type in asm.GetTypes().Where(t => t.Name.Contains("Tool")))
                 {
-                    //                    WriteLogMessage($"Method: {method.Name}");
-                    var hasToolAttribute = method.GetCustomAttributes()
-                        .Any(attr => attr.GetType().Name == "McpServerToolAttribute");
+                    Log($"📦 Found tool type: {type.FullName}");
+                    var methodRecords = new List<object>();
 
-                    if (!hasToolAttribute) continue;
+                    foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
+                                                           BindingFlags.Static | BindingFlags.Instance))
+                    {
+                        var hasToolAttr = method.GetCustomAttributes(false)
+                                                .Any(attr => attr.GetType().FullName == "ModelContextProtocol.Server.McpServerToolAttribute");
 
-                    var signature = $"{type.FullName}.{method.Name}({string.Join(", ", method.GetParameters().Select(p => p.ParameterType.Name))})";
-                    toolMap[method.Name] = signature;
+                        var parameters = method.GetParameters()
+                                               .Select(p => new { Name = p.Name, Type = p.ParameterType.FullName })
+                                               .ToList();
+
+                        var visibility = method.IsPublic ? "public"
+                                       : method.IsPrivate ? "private"
+                                       : method.IsFamily ? "protected"
+                                       : "internal";
+
+                        var entry = new
+                        {
+                            Method = method.Name,
+                            ReturnType = method.ReturnType.FullName,
+                            Parameters = parameters,
+                            Accessibility = visibility,
+                            HasMcpServerToolAttribute = hasToolAttr
+                        };
+
+                        methodRecords.Add(entry);
+
+                        if (hasToolAttr)
+                        {
+                            var argList = string.Join(", ", parameters.Select(p => $"{p.Name}: {p.Type}"));
+                            Log($"✔️ Registered tool method: {type.FullName}.{method.Name}({argList})");
+                        }
+                    }
+
+                    manifest.Add(new
+                    {
+                        Type = type.FullName,
+                        Methods = methodRecords
+                    });
                 }
             }
-        }
 
-        WriteLogMessage("=== MCP Registered Tools ===");
-        WriteLogMessage($"toolMap: {toolMap.Count}");
-        foreach (var kvp in toolMap.OrderBy(kvp => kvp.Key))
+            File.WriteAllText(jsonPath, JsonSerializer.Serialize(manifest, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            }));
+
+            Log($"✅ Tool manifest written to: {jsonPath}");
+        }
+        catch (Exception ex)
         {
-            WriteLogMessage($"{kvp.Key}: {kvp.Value}");
+            Log($"❌ Error: {ex.Message}");
         }
     }
 }

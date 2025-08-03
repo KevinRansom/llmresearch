@@ -1,11 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RollForward>Major</RollForward>
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
-    <LangVersion>12.0</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- Set up the NuGet package to be an MCP server -->
@@ -28,7 +27,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-preview.6.25358.103" />
-    <PackageReference Include="ModelContextProtocol" Version="0.3.0-preview.3" />
+      <PackageReference Include="ModelContextProtocol" Version="0.3.0-preview.3" />
+      <PackageReference Include="ModelContextProtocol.Core" Version="0.3.0-preview.3" />
   </ItemGroup>
 
   <ItemGroup>

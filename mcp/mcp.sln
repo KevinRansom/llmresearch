@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36327.8
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectMcp", "DirectMCP\DirectMcp.csproj", "{029550BC-A4C2-8C96-5F4A-0ACF8CFA6694}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RegisterWIthGemma", "RegisterWithGemma\RegisterWIthGemma.csproj", "{0073C131-D50B-8AD3-6586-6D5D1FD90C75}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{029550BC-A4C2-8C96-5F4A-0ACF8CFA6694}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{029550BC-A4C2-8C96-5F4A-0ACF8CFA6694}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{029550BC-A4C2-8C96-5F4A-0ACF8CFA6694}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{029550BC-A4C2-8C96-5F4A-0ACF8CFA6694}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0073C131-D50B-8AD3-6586-6D5D1FD90C75}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0073C131-D50B-8AD3-6586-6D5D1FD90C75}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0073C131-D50B-8AD3-6586-6D5D1FD90C75}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0073C131-D50B-8AD3-6586-6D5D1FD90C75}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {32FA1E66-DC5C-478D-933C-E1172AB699F7}
+	EndGlobalSection
+EndGlobal

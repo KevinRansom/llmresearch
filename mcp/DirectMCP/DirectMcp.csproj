@@ -7,8 +7,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\DirectMCP\DirectMcp.csproj" />
-  </ItemGroup>
-
 </Project>
