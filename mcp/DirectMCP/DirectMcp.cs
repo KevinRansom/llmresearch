@@ -1,23 +1,37 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.IO;
 using System.Net.Http;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Reflection.Metadata;
+using System.Text;
+using System.Threading.Tasks;
 
-class Program
+class DirectMcp
 {
     static readonly HttpClient client = new();
 
-    static void Main()
+    static async Task Main()
     {
-        var options = new JsonSerializerOptions
+        Console.InputEncoding = Encoding.UTF8;
+        Console.OutputEncoding = Encoding.UTF8;
+
+        // Start tool handler endpoint server on a background thread
+        _ = Task.Run(() => ToolEndpointServer.StartServer(9876));
+
+        // Internal registration payload—merged from RegisterWithGemma
+        var registration = new JsonRpcRequest
         {
-            PropertyNameCaseInsensitive = true
+            JsonRpcVersion = "2.0",
+            Method = "registerTool",
+            Params = null,
+            Id = Guid.NewGuid().ToString()
         };
 
-        Console.InputEncoding = System.Text.Encoding.UTF8;
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        // Handle registration payload directly without inter-process
+        var response = await HandleRequest(registration);
+        Console.WriteLine(JsonConvert.SerializeObject(response));
 
+        // Enter console loop to handle additional JSON-RPC requests
         while (true)
         {
             var line = Console.ReadLine();
@@ -25,90 +39,170 @@ class Program
 
             try
             {
-                var request = JsonSerializer.Deserialize<JsonRpcRequest>(line, options);
+                var request = JsonConvert.DeserializeObject<JsonRpcRequest>(line);
 
                 if (request == null)
                 {
-                    var error = new
+                    var error = new JsonRpcResponse
                     {
-                        jsonrpc = "2.0",
-                        id = (string?)null,
-                        error = new
+                        JsonRpcVersion = "2.0",
+                        Id = null,
+                        Error = new JsonRpcError
                         {
-                            code = -32700,
-                            message = "Deserializer returned null — unable to parse JSON-RPC request.",
-                            data = new
-                            {
-                                input = line,
-                                note = "Payload was structurally valid but deserialized to null."
-                            }
+                            Code = -32700,
+                            Message = "Deserializer returned null — unable to parse JSON-RPC request.",
+                            Data = new { input = line }
                         }
                     };
 
-                    Console.WriteLine(JsonSerializer.Serialize(error, options));
+                    Console.WriteLine(JsonConvert.SerializeObject(error));
                     continue;
                 }
 
-                var response = HandleRequest(request);
-                Console.WriteLine(JsonSerializer.Serialize(response, options));
+                var liveResponse = await HandleRequest(request);
+                Console.WriteLine(JsonConvert.SerializeObject(liveResponse));
             }
             catch (JsonException ex)
             {
-                var error = new
+                var error = new JsonRpcResponse
                 {
-                    jsonrpc = "2.0",
-                    id = (string?)null,
-                    error = new
+                    JsonRpcVersion = "2.0",
+                    Id = null,
+                    Error = new JsonRpcError
                     {
-                        code = -32700,
-                        message = "JSON parsing error during deserialization.",
-                        data = new
-                        {
-                            input = line,
-                            exception = ex.Message
-                        }
+                        Code = -32700,
+                        Message = "JSON parsing error during deserialization.",
+                        Data = new { input = line, exception = ex.Message }
                     }
                 };
 
-                Console.WriteLine(JsonSerializer.Serialize(error, options));
+                Console.WriteLine(JsonConvert.SerializeObject(error));
             }
         }
     }
 
-    static JsonRpcResponse HandleRequest(JsonRpcRequest request)
+    static async Task<JsonRpcResponse> HandleRequest(JsonRpcRequest request)
     {
-        if (request.method == "registerTool")
+        if (request.Method == "registerTool")
         {
-            var json = JsonSerializer.Serialize(request);
-            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var payload = new
+            {
+                model = "gemma3:4B",
+                messages = new[]
+                {
+                    new { role = "system", content = "You are a helpful assistant." },
+                    new { role = "user", content = "Tell me something fascinating about the history of Istanbul." }
+                },
+                tools = new[]
+                {
+                    new
+                    {
+                        tool_name = "toolName",
+                        handler = "http://localhost:9876/tools/toolName",
+                        description = "A tool that retrieves information based on paramA.",
+                        parameters = new
+                        {
+                            type = "object",
+                            properties = new
+                            {
+                                paramA = new
+                                {
+                                    type = "string",
+                                    description = "Location or keyword"
+                                }
+                            },
+                            required = new[] { "paramA" }
+                        }
+                    }
+                }
+            };
 
-            // POST to Gemma’s model server
-            var response = client.PostAsync("http://127.0.0.1:62097/api/tool", content).Result;
+            var json = JsonConvert.SerializeObject(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            // Optional: log success/failure to stdout
-            Console.WriteLine($"Registration sent, status: {response.StatusCode}");
+            var response = await client.PostAsync("http://localhost:11434/api/chat", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            dynamic? result = JsonConvert.DeserializeObject<dynamic>(responseContent);
+
+            if (result?.tool_calls != null)
+            {
+                foreach (var call in result.tool_calls)
+                {
+                    var simulatedResponse = new
+                    {
+                        tool_responses = new[]
+                        {
+                            new
+                            {
+                                tool_name = (string)call.function_name,
+                                response = new { result = $"Simulated result for {call.parameters.paramA}" }
+                            }
+                        }
+                    };
+                    // You can emit this to console or log if needed
+                }
+            }
+
+            return new JsonRpcResponse
+            {
+                Id = request.Id,
+                Result = $"Echo: {request.Method} handled as inline tool definition"
+            };
         }
 
         return new JsonRpcResponse
         {
-            id = request.id,
-            result = $"Echo: {request.method} received"
+            Id = request.Id,
+            Error = new JsonRpcError
+            {
+                Code = -32601,
+                Message = $"Method '{request.Method}' not found"
+            }
         };
     }
-
 }
+
+// JSON-RPC support types
 
 public class JsonRpcRequest
 {
-    public string? jsonrpc { get; set; }
-    public string? method { get; set; }
-    public object? @params { get; set; }
-    public object? id { get; set; }
+    [JsonProperty("jsonrpc")]
+    public string? JsonRpcVersion { get; set; }
+
+    [JsonProperty("method")]
+    public string? Method { get; set; }
+
+    [JsonProperty("params")]
+    public object? Params { get; set; }
+
+    [JsonProperty("id")]
+    public object? Id { get; set; }
 }
 
 public class JsonRpcResponse
 {
-    public string jsonrpc { get; set; } = "2.0";
-    public object? result { get; set; }
-    public object? id { get; set; }
+    [JsonProperty("jsonrpc")]
+    public string JsonRpcVersion { get; set; } = "2.0";
+
+    [JsonProperty("result")]
+    public object? Result { get; set; }
+
+    [JsonProperty("error")]
+    public JsonRpcError? Error { get; set; }
+
+    [JsonProperty("id")]
+    public object? Id { get; set; }
+}
+
+public class JsonRpcError
+{
+    [JsonProperty("code")]
+    public int Code { get; set; }
+
+    [JsonProperty("message")]
+    public string? Message { get; set; }
+
+    [JsonProperty("data")]
+    public object? Data { get; set; }
 }

@@ -3,46 +3,38 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
-class GemmaToolRegistration
+class RegisterWithGemma
 {
     static void Main()
     {
-        // Prepare registration payload
         var registration = new
         {
             jsonrpc = "2.0",
             method = "registerTool",
             @params = new
             {
-                name = "EchoTool",
-                description = "Echoes incoming JSON-RPC method names.",
-                methods = new[]
+                tools = new[]
                 {
                     new
                     {
-                        name = "diagnose",
-                        description = "Returns the method name and params for inspection.",
+                        name = "toolName",
+                        description = "Describe what it does",
                         parameters = new
                         {
                             type = "object",
                             properties = new
                             {
-                                input = new { type = "string" }
+                                paramA = new
+                                {
+                                    type = "string",
+                                    description = "Example parameter"
+                                }
                             },
-                            required = new[] { "input" }
-                        },
-                        returns = new
-                        {
-                            type = "object",
-                            properties = new
-                            {
-                                report = new { type = "string" }
-                            }
+                            required = new[] { "paramA" }
                         }
                     }
                 }
-            },
-            id = 1
+            }
         };
 
         string requestJson = JsonSerializer.Serialize(registration);
