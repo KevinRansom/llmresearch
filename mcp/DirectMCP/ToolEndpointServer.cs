@@ -19,7 +19,7 @@ static class ToolEndpointServer
             var request = context.Request;
             var response = context.Response;
 
-            if (request.HttpMethod == "POST" && request?.Url?.AbsolutePath == "/tools/toolName")
+            if (request.HttpMethod == "POST" && request.Url?.AbsolutePath == "/tools/toolName")
             {
                 using var reader = new StreamReader(request.InputStream);
                 var body = reader.ReadToEnd();

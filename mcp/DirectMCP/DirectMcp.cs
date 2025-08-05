@@ -17,6 +17,7 @@ class DirectMcp
 
         // Start tool handler endpoint server on a background thread
         _ = Task.Run(() => ToolEndpointServer.StartServer(9876));
+        _ = Task.Run(() => OllamaProxyServer.StartOllamaProxy());
 
         // Internal registration payload—merged from RegisterWithGemma
         var registration = new JsonRpcRequest

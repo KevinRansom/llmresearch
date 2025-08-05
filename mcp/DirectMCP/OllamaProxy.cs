@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 class OllamaProxyServer
 {
-    const int ProxyPort = 8080; // Your proxy listens here
+    const int ProxyPort = 11435;                // Your proxy listens here
     const int OllamaDefaultPort = 11434;
 
-    static async Task StartOllamaProxy()
+    static public async Task StartOllamaProxy()
     {
         int ollamaPort = FindOllamaPort() ?? OllamaDefaultPort;
         string ollamaHost = $"http://127.0.0.1:{ollamaPort}";
@@ -24,8 +24,11 @@ class OllamaProxyServer
 
         while (true)
         {
+            Console.WriteLine(".");
             var context = await listener.GetContextAsync();
+            Console.WriteLine("+");
             _ = Task.Run(() => HandleRequest(context, ollamaHost));
+            Console.WriteLine("-");
         }
     }
 
@@ -35,7 +38,7 @@ class OllamaProxyServer
         {
             var request = context.Request;
             var body = new StreamReader(request.InputStream).ReadToEnd();
-            var targetUrl = $"{ollamaHost}{request.Url.PathAndQuery}";
+            var targetUrl = $"{ollamaHost}{request.Url?.PathAndQuery}";
 
             using var client = new HttpClient();
             var content = new StringContent(body, Encoding.UTF8, request.ContentType ?? "application/json");
@@ -47,7 +50,7 @@ class OllamaProxyServer
             await context.Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(responseBody));
             context.Response.Close();
 
-            Console.WriteLine($"[→] Forwarded to Ollama: {request.Url.PathAndQuery}");
+            Console.WriteLine($"[→] Forwarded to Ollama: {request.Url?.PathAndQuery}");
         }
         catch (Exception ex)
         {
