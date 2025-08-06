@@ -57,6 +57,17 @@ public class OllamaProxy
         var request = context.Request;
         var response = context.Response;
 
+        if (request.HttpMethod == "OPTIONS")
+        {
+            response.StatusCode = 204;
+            response.AddHeader("Access-Control-Allow-Origin", request.Headers["Origin"] ?? "*");
+            response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            response.AddHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, User-Agent, Accept");
+            response.AddHeader("Access-Control-Max-Age", "86400");
+            response.OutputStream.Close();
+            return;
+        }
+
         try
         {
             var (isProbe, bufferedBody) = await IsProbePayloadAsync(request.InputStream);
@@ -111,6 +122,11 @@ public class OllamaProxy
         }
         finally
         {
+            response.AddHeader("Access-Control-Allow-Origin", request.Headers["Origin"] ?? "*");
+            response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            response.AddHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, User-Agent, Accept");
+            response.AddHeader("Access-Control-Max-Age", "86400");
+
             response.OutputStream.Close();
         }
     }
@@ -146,6 +162,6 @@ public class OllamaProxy
             }
         }
 
-        return $"http://127.0.0.1:{ProxyPort}/";
+        return $"http://127.0.0.1:{OllamaDefaultPort}/";
     }
 }
