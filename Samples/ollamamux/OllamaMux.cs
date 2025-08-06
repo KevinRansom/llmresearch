@@ -1,7 +1,9 @@
-﻿namespace Ollamamux
+﻿namespace OllamaMux
 {
     using System;
+    using System.Linq;
     using System.Threading.Tasks;
+    using static System.Runtime.InteropServices.JavaScript.JSType;
 
     class Program
     {
@@ -23,6 +25,7 @@
                 await proxy.StartAsync();
 
                 // Here we go to ollama
+                await OllamaProcess.RunAsync(args);
             }
             else
             {

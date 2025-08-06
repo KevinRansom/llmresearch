@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace Ollamamux
+﻿namespace OllamaMux
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+
     public class OllamaCommandHandler
     {
         private class CommandInfo
@@ -21,12 +21,12 @@ namespace Ollamamux
             Error
         }
 
-        private readonly Dictionary<string, CommandInfo> _commands;
+        private readonly Dictionary<string, CommandInfo> commands;
         private readonly string[] empty = Array.Empty<string>();
 
         public OllamaCommandHandler()
         {
-            _commands = new Dictionary<string, CommandInfo>(StringComparer.OrdinalIgnoreCase)
+            commands = new Dictionary<string, CommandInfo>(StringComparer.OrdinalIgnoreCase)
             {
                 ["serve"] = new CommandInfo
                 {
@@ -177,7 +177,7 @@ namespace Ollamamux
 
             if (args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
             {
-                if (args.Length > 1 && _commands.TryGetValue(args[1], out var cmd))
+                if (args.Length > 1 && commands.TryGetValue(args[1], out var cmd))
                     return DisplayHelp(cmd.ShowHelp);
                 else
                     return DisplayHelp();
@@ -186,7 +186,7 @@ namespace Ollamamux
             var command = args[0];
             var tail = args.Skip(1).ToList();
 
-            if (_commands.TryGetValue(command, out var info))
+            if (commands.TryGetValue(command, out var info))
             {
                 if (tail.Count > 0 && (tail[0] == "--help" || tail[0] == "-h"))
                     return DisplayHelp(info.ShowHelp);
@@ -212,12 +212,12 @@ namespace Ollamamux
         private CommandOutcome DisplayHelp()
         {
             Console.WriteLine("Large language model runner\n");
-            Console.WriteLine("Usage:\n  ollama [flags]\n  ollama [command]\n");
+            Console.WriteLine("Usage:\n  ollamamux [flags]\n  ollamamux [command]\n");
             Console.WriteLine("Available Commands:");
-            foreach (var kvp in _commands)
+            foreach (var kvp in commands)
                 Console.WriteLine($"  {kvp.Key,-10} {kvp.Value.Description}");
-            Console.WriteLine("\nFlags:\n  -h, --help      help for ollama\n  -v, --version   Show version information");
-            Console.WriteLine("\nUse \"ollama [command] --help\" or \"ollama help [command]\" for more information about a command.");
+            Console.WriteLine("\nFlags:\n  -h, --help      help for ollamamux\n  -v, --version   Show version information");
+            Console.WriteLine("\nUse \"ollamamux [command] --help\" or \"ollamamux help [command]\" for more information about a command.");
             return CommandOutcome.HelpDisplayed;
         }
 
