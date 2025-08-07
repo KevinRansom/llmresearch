@@ -9,7 +9,7 @@
 
     static class OllamaProcess
     {
-        public static async Task<int> RunAsync(string[] args)
+        public static async Task<int> RunAsync(string[] args, string ollamaExecutionHost)
         {
             var binaryName = OperatingSystem.IsWindows() ? "ollama.exe" : "ollama";
             try
@@ -25,6 +25,9 @@
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 };
+                startInfo.EnvironmentVariables["OLLAMA_HOST"] = ollamaExecutionHost;
+
+                Console.WriteLine($"[✓] Set OLLAMA_HOST={ollamaExecutionHost}");
 
                 using var process = new Process { StartInfo = startInfo };
                 process.OutputDataReceived += (sender, e) => { if (e.Data != null) Console.WriteLine(e.Data); };

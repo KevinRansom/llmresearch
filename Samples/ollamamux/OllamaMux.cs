@@ -10,26 +10,29 @@
         static async Task Main(string[] args)
         {
             var handler = new OllamaCommandHandler();
-            if (handler.Execute(args) == OllamaCommandHandler.CommandOutcome.HelpDisplayed)
+            var commandOutcome = handler.Execute(args);
+            switch(commandOutcome)
             {
-                //Nothing to do here, help was displayed
-            }
-            else if (handler.Execute(args) == OllamaCommandHandler.CommandOutcome.Executed)
-            {
-                var proxy = new OllamaProxy();
-                if (await proxy.IsProxyAlreadyRunningAsync())
-                {
-                    Console.WriteLine("[?] Detected sibling Ollama proxy running..");
-                }
+                case OllamaCommandHandler.CommandOutcome.HelpDisplayed:
+                    //Nothing to do here, help was displayed
+                    break;
 
-                await proxy.StartAsync();
+                case OllamaCommandHandler.CommandOutcome.Executed:
 
-                // Here we go to ollama
-                await OllamaProcess.RunAsync(args);
-            }
-            else
-            {
-                // An error has been reported do nothing 
+                    var proxy = new OllamaProxy();
+                    if (await proxy.IsProxyAlreadyRunningAsync())
+                    {
+                        Console.WriteLine("[?] Detected sibling Ollama proxy running..");
+                    }
+                    var ollamaExecutionHost = proxy.StartProxy();
+
+                    // Here we go to ollama
+                    await OllamaProcess.RunAsync(args, ollamaExecutionHost);
+                    break;
+
+                case OllamaCommandHandler.CommandOutcome.Error:
+                    // An error has been reported do nothing 
+                    break;
             }
         }
     }
