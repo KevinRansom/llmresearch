@@ -12,13 +12,13 @@
         {
             var proxyMain = new OllamaProxy();
             var (muxHostMain, execHostMain) = OllamaProxy.GetHosts();
-
-            if (!args.Contains("serve") && !await proxyMain.IsProxyAlreadyRunningAsync())
+            var detached = !args.Contains("serve");
+            if (!await proxyMain.IsProxyAlreadyRunningAsync())
             {
                 using var muxLock = OllamaProxy.TryAcquireMuxLock();
                 if (muxLock != null)
                 {
-                    proxyMain.StartProxyDetached();
+                    proxyMain.StartProxy(detached);
                 }
 
                 await OllamaProxy.WaitForHealthyAsync(proxyMain, TimeSpan.FromSeconds(3));

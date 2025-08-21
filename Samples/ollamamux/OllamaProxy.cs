@@ -187,22 +187,21 @@ namespace OllamaMux
             return Task.CompletedTask;
         }
 
-        public string StartProxy()
+        public string StartProxy(bool detached)
         {
             var (ollamaMuxHost, ollamaExecutionHost) = GetHosts();
-            _ = StartAsync(ollamaMuxHost, ollamaExecutionHost);
-            return ollamaExecutionHost;
-        }
-        public string StartProxyDetached()
-        {
-            var (ollamaMuxHost, ollamaExecutionHost) = GetHosts();
-
-            // Spawn a detached `serve` instance of *this* executable
-            // The assembly name will be .dll, so change it to the extension of the launcher
-            var exePath = Path.ChangeExtension(Assembly.GetExecutingAssembly().Location, "exe");
-            if (!OllamaProcess.TryLaunchRunProgramDetachedDetached(exePath, "serve"))
-                throw new InvalidOperationException("Failed to launch ollamamux in detached mode.");
-
+            if (detached)
+            {
+                // Spawn a detached `serve` instance of *this* executable
+                // The assembly name will be .dll, so change it to the extension of the launcher
+                var exePath = Path.ChangeExtension(Assembly.GetExecutingAssembly().Location, "exe");
+                if (!OllamaProcess.TryLaunchRunProgramDetachedDetached(exePath, "serve"))
+                    throw new InvalidOperationException("Failed to launch ollamamux in detached mode.");
+            }
+            else
+            {
+                _ = StartAsync(ollamaMuxHost, ollamaExecutionHost);
+            }
             return ollamaExecutionHost;
         }
 
