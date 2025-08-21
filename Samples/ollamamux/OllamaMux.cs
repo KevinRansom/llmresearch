@@ -1,33 +1,31 @@
-﻿namespace Ollamamux
+﻿namespace OllamaMux
 {
     using System;
+    using System.Linq;
+    using System.Reflection;
+    using System.Threading;
     using System.Threading.Tasks;
 
     class Program
     {
         static async Task Main(string[] args)
         {
-            var handler = new OllamaCommandHandler();
-            if (handler.Execute(args) == OllamaCommandHandler.CommandOutcome.HelpDisplayed)
+            var proxyMain = new OllamaProxy();
+            var (muxHostMain, execHostMain) = OllamaProxy.GetHosts();
+
+            if (!args.Contains("serve") && !await proxyMain.IsProxyAlreadyRunningAsync())
             {
-                //Nothing to do here, help was displayed
-            }
-            else if (handler.Execute(args) == OllamaCommandHandler.CommandOutcome.Executed)
-            {
-                var proxy = new OllamaProxy();
-                if (await proxy.IsProxyAlreadyRunningAsync())
+                using var muxLock = OllamaProxy.TryAcquireMuxLock();
+                if (muxLock != null)
                 {
-                    Console.WriteLine("[?] Detected sibling Ollama proxy running..");
+                    proxyMain.StartProxyDetached();
                 }
 
-                await proxy.StartAsync();
+                await OllamaProxy.WaitForHealthyAsync(proxyMain, TimeSpan.FromSeconds(3));
+            }
 
-                // Here we go to ollama
-            }
-            else
-            {
-                // An error has been reported do nothing 
-            }
+            var handler = new OllamaCommandHandler();
+            var commandOutcome = await handler.ExecuteAsync(args);
         }
     }
 }

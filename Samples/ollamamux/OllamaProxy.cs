@@ -1,167 +1,438 @@
-﻿using System;
-using System.IO;
-using System.Net;
-using System.Net.Http;
-using System.Net.NetworkInformation;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Microsoft.Extensions.Logging;
+using System;
 
-public class OllamaProxy
+namespace OllamaMux
 {
-    private const int ProxyPort = 11435;
-    private const int OllamaDefaultPort = 11434;
-    private const string AckGuid = "{2FE6FFE6-C2AC-4DC0-BFAD-2371B47AAE71}";
+    using Microsoft.Extensions.Logging;
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.IO;
+    using System.Linq;
+    using System.Net;
+    using System.Net.Http;
+    using System.Net.Http.Headers;
+    using System.Reflection;
+    using System.Text;
+    using System.Threading;
+    using System.Threading.Tasks;
 
-    public async Task<bool> IsProxyAlreadyRunningAsync()
+    class OllamaProxy
     {
-        try
+        private const int OllamaDefaultPort = 11434;
+        private const int OllamaExecutionPort = 11435;
+        private const string AckGuid = "2FE6FFE6-C2AC-4DC0-BFAD-2371B47AAE71";
+
+        private readonly ILogger _log;
+
+        public OllamaProxy() : this(Log.CreateFactory().CreateLogger<OllamaProxy>()) { }
+
+        public OllamaProxy(ILogger logger)
         {
-            using var client = new HttpClient();
-            var probePayload = new StringContent(
-                $"{{\"model\": \"llama2\", \"isOllamaProxy\": \"{AckGuid}\"}}",
-                Encoding.UTF8,
-                "application/json"
-            );
-
-            var response = await client.PostAsync($"http://127.0.0.1:{ProxyPort}/api/generate", probePayload);
-            var body = await response.Content.ReadAsStringAsync();
-
-            return response.IsSuccessStatusCode && body.Contains("\"acknowledged\":true");
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public async Task StartAsync()
-    {
-        string ollamaHost = GetHost();
-        Environment.SetEnvironmentVariable("OLLAMA_HOST", ollamaHost);
-        Console.WriteLine($"[?] Proxy forwarding to Ollama at {ollamaHost}");
-
-        var listener = new HttpListener();
-        listener.Prefixes.Add($"http://127.0.0.1:{ProxyPort}/");
-        listener.Start();
-        Console.WriteLine($"[?] Proxy listening on http://127.0.0.1:{ProxyPort}/");
-
-        while (true)
-        {
-            var context = await listener.GetContextAsync();
-            _ = Task.Run(() => HandleRequestAsync(context, ollamaHost));
-        }
-    }
-
-    private async Task HandleRequestAsync(HttpListenerContext context, string targetHost)
-    {
-        var request = context.Request;
-        var response = context.Response;
-
-        if (request.HttpMethod == "OPTIONS")
-        {
-            response.StatusCode = 204;
-            response.AddHeader("Access-Control-Allow-Origin", request.Headers["Origin"] ?? "*");
-            response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            response.AddHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, User-Agent, Accept");
-            response.AddHeader("Access-Control-Max-Age", "86400");
-            response.OutputStream.Close();
-            return;
+            _log = logger;
         }
 
-        try
+        private static readonly SocketsHttpHandler HttpHandler = new()
         {
-            var (isProbe, bufferedBody) = await IsProbePayloadAsync(request.InputStream);
-            if (request.Url?.AbsolutePath == "/api/generate" &&
-                request.HttpMethod == "POST" &&
-                isProbe)
-            {
-                response.StatusCode = 200;
-                var ack = Encoding.UTF8.GetBytes("{\"acknowledged\":true}");
-                response.ContentType = "application/json";
-                await response.OutputStream.WriteAsync(ack, 0, ack.Length);
-                response.OutputStream.Close();
-                return;
-            }
+            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            MaxConnectionsPerServer = 128,
+            AllowAutoRedirect = false
+        };
 
-            using var client = new HttpClient();
-            var forwardRequest = new HttpRequestMessage(
-                new HttpMethod(request.HttpMethod),
-                $"{targetHost}{request.Url?.PathAndQuery}"
-            )
-            {
-                Content = new ByteArrayContent(bufferedBody)
-            };
-
-            if (!string.IsNullOrEmpty(request.ContentType))
-            {
-                forwardRequest.Content.Headers.ContentType =
-                    new System.Net.Http.Headers.MediaTypeHeaderValue(request.ContentType);
-            }
-
-            var upstreamResponse = await client.SendAsync(forwardRequest, HttpCompletionOption.ResponseHeadersRead);
-            response.StatusCode = (int)upstreamResponse.StatusCode;
-
-            var originalContentType = upstreamResponse.Content.Headers.ContentType?.ToString();
-            var mediaType = upstreamResponse.Content.Headers.ContentType?.MediaType;
-            response.ContentType = mediaType ?? "application/json";
-
-            if (originalContentType != response.ContentType)
-            {
-                Console.WriteLine($"[!] Sanitized Content-Type. Original: '{originalContentType}', Sent: '{response.ContentType}'");
-            }
-
-            using var stream = await upstreamResponse.Content.ReadAsStreamAsync();
-            await stream.CopyToAsync(response.OutputStream);
-        }
-        catch (Exception ex)
+        private static readonly HttpClient Upstream = new(HttpHandler)
         {
-            Console.Error.WriteLine($"[!] Proxy error: {ex.Message}");
-            response.StatusCode = 500;
-            var errorBytes = Encoding.UTF8.GetBytes($"{{\"error\":\"{ex.Message}\"}}");
-            await response.OutputStream.WriteAsync(errorBytes, 0, errorBytes.Length);
-        }
-        finally
+            Timeout = Timeout.InfiniteTimeSpan
+        };
+
+        private static readonly HashSet<string> HopByHop = new(StringComparer.OrdinalIgnoreCase)
         {
-            response.AddHeader("Access-Control-Allow-Origin", request.Headers["Origin"] ?? "*");
-            response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            response.AddHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, User-Agent, Accept");
-            response.AddHeader("Access-Control-Max-Age", "86400");
+            "Connection","Keep-Alive","Proxy-Authenticate","Proxy-Authorization","TE",
+            "Trailer","Transfer-Encoding","Upgrade","Proxy-Connection"
+        };
 
-            response.OutputStream.Close();
-        }
-    }
-
-    private async Task<(bool isProbe, byte[] bufferedBody)> IsProbePayloadAsync(Stream stream)
-    {
-        using var ms = new MemoryStream();
-        await stream.CopyToAsync(ms);
-        var bufferedBody = ms.ToArray();
-
-        var content = Encoding.UTF8.GetString(bufferedBody);
-        var isProbe = content.Contains($"\"isOllamaProxy\": \"{AckGuid}\"");
-        return (isProbe, bufferedBody);
-    }
-
-    private static string GetHost()
-    {
-        var host = Environment.GetEnvironmentVariable("OLLAMA_HOST");
-
-        if (!string.IsNullOrWhiteSpace(host))
+        private static readonly HashSet<string> SkipRequestHeaders = new(StringComparer.OrdinalIgnoreCase)
         {
+            "Host", "Accept-Encoding"
+        };
+
+        private static readonly HashSet<string> SkipResponseHeaders = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Content-Length","Transfer-Encoding","Connection","Keep-Alive","Server","Date","Proxy-Connection"
+        };
+
+        public async Task<bool> IsProxyAlreadyRunningAsync()
+        {
+            var (ollamaMuxHost, _) = GetHosts();
+            var baseUri = NormalizeBaseUri(ollamaMuxHost);
+            var probeUri = new Uri(baseUri, "__mux/health");
+
             try
             {
-                var uri = new Uri(host, UriKind.RelativeOrAbsolute);
-                if (!uri.IsAbsoluteUri)
-                    uri = new Uri($"http://{host}");
-
-                return uri.ToString(); // Return parsed host if valid
+                using var resp = await Upstream.GetAsync(probeUri);
+                var body = await resp.Content.ReadAsStringAsync();
+                return resp.IsSuccessStatusCode &&
+                       body.Contains("\"acknowledged\":true", StringComparison.OrdinalIgnoreCase) &&
+                       body.Contains(AckGuid, StringComparison.OrdinalIgnoreCase);
             }
-            catch
+            catch (Exception ex)
             {
-                Console.Error.WriteLine($"[!] Invalid OLLAMA_HOST: '{host}'. Falling back to proxy.");
+                _log.LogDebug(LogEvent.HealthCheckFailed, ex, "Health check failed for {ProbeUri}", probeUri);
+                return false;
             }
         }
 
-        return $"http://127.0.0.1:{OllamaDefaultPort}/";
+        private const string MutexName = @"Global\ollamamux-serve";
+
+        public static Mutex? TryAcquireMuxLock()
+        {
+            var muxLock = new Mutex(false, MutexName, out _);
+            try
+            {
+                if (muxLock.WaitOne(TimeSpan.FromSeconds(10)))
+                    return muxLock;
+            }
+            catch { /* ignore */ }
+
+            muxLock.Dispose();
+            return null;
+        }
+
+        public static async Task<bool> EnsureProxyServeAsync(OllamaProxy proxy, TimeSpan waitBudget)
+        {
+            if (await proxy.IsProxyAlreadyRunningAsync()) return true;
+
+            using var mutex = new Mutex(false, MutexName, out _);
+            var gotLock = false;
+            try { gotLock = mutex.WaitOne(TimeSpan.FromSeconds(10)); } catch { }
+
+            if (gotLock)
+            {
+                try
+                {
+                    // Double‑check under the lock
+                    if (await proxy.IsProxyAlreadyRunningAsync()) return true;
+
+                    if (!OllamaProcess.TryLaunchRunProgramDetachedDetached(
+                            Assembly.GetExecutingAssembly().Location, "serve"))
+                        return false;
+
+                    // Wait for health
+                    var sw = Stopwatch.StartNew();
+                    while (sw.Elapsed < waitBudget)
+                    {
+                        if (await proxy.IsProxyAlreadyRunningAsync()) return true;
+                        await Task.Delay(300);
+                    }
+                    return false;
+                }
+                finally { try { mutex.ReleaseMutex(); } catch { } }
+            }
+            else
+            {
+                // Someone else is launching — wait
+                var sw = Stopwatch.StartNew();
+                while (sw.Elapsed < waitBudget)
+                {
+                    if (await proxy.IsProxyAlreadyRunningAsync()) return true;
+                    await Task.Delay(300);
+                }
+                return false;
+            }
+        }
+
+        private Task StartAsync(string ollamaMuxHost, string ollamaExecutionHost)
+        {
+            var muxBase = NormalizeBaseUri(ollamaMuxHost);
+            var execBase = NormalizeBaseUri(ollamaExecutionHost);
+
+            if (UriEquals(muxBase, execBase))
+                throw new InvalidOperationException("Mux host and execution host are identical — would loop.");
+
+            var listener = new HttpListener();
+            listener.Prefixes.Add(muxBase.ToString());
+            listener.Start();
+
+            _ = Task.Run(async () =>
+            {
+                while (true)
+                {
+                    HttpListenerContext? ctx = null;
+                    try
+                    {
+                        ctx = await listener.GetContextAsync();
+                        _ = Task.Run(() => HandleRequestAsync(ctx, execBase));
+                    }
+                    catch (HttpListenerException hlex) when (hlex.ErrorCode == 995 || hlex.ErrorCode == 500)
+                    {
+                        if (!listener.IsListening) break;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError(ex, "Accept loop error");
+                        if (ctx != null)
+                        {
+                            try { ctx.Response.StatusCode = 500; ctx.Response.OutputStream.Close(); } catch { }
+                        }
+                    }
+                }
+            });
+
+            _log.LogInformation(LogEvent.ProxyStart, "Proxy listening on {MuxBase}", muxBase);
+            _log.LogInformation("Forwarding to Ollama at {ExecBase}", execBase);
+            return Task.CompletedTask;
+        }
+
+        public string StartProxy()
+        {
+            var (ollamaMuxHost, ollamaExecutionHost) = GetHosts();
+            _ = StartAsync(ollamaMuxHost, ollamaExecutionHost);
+            return ollamaExecutionHost;
+        }
+        public string StartProxyDetached()
+        {
+            var (ollamaMuxHost, ollamaExecutionHost) = GetHosts();
+
+            // Spawn a detached `serve` instance of *this* executable
+            // The assembly name will be .dll, so change it to the extension of the launcher
+            var exePath = Path.ChangeExtension(Assembly.GetExecutingAssembly().Location, "exe");
+            if (!OllamaProcess.TryLaunchRunProgramDetachedDetached(exePath, "serve"))
+                throw new InvalidOperationException("Failed to launch ollamamux in detached mode.");
+
+            return ollamaExecutionHost;
+        }
+
+        public static async Task<bool> WaitForHealthyAsync(OllamaProxy proxy, TimeSpan budget)
+        {
+            var sw = Stopwatch.StartNew();
+            while (sw.Elapsed < budget)
+            {
+                if (await proxy.IsProxyAlreadyRunningAsync())
+                    return true;
+                await Task.Delay(300);
+            }
+            return false;
+        }
+
+        private async Task HandleRequestAsync(HttpListenerContext context, Uri targetBase)
+        {
+            var rid = Guid.NewGuid().ToString("n")[..8];
+            using var _ = _log.BeginScope(new Dictionary<string, object> { ["rid"] = rid });
+
+            var sw = Stopwatch.StartNew();
+            var request = context.Request;
+            var response = context.Response;
+
+            // await nop
+            await Task.Yield();
+
+            _log.LogInformation(LogEvent.RequestReceived,
+                "→ {Method} {PathQuery} (from {Remote}) Headers: {Headers} [rid:{Rid}]",
+                request.HttpMethod, request.Url?.PathAndQuery, request.RemoteEndPoint, FormatHeaders(request.Headers), rid);
+        }
+
+        private void CopyRequestHeaders(HttpListenerRequest src, HttpRequestMessage dst)
+        {
+            foreach (string? name in src.Headers.AllKeys)
+            {
+                if (string.IsNullOrEmpty(name)) continue;
+                if (HopByHop.Contains(name) || SkipRequestHeaders.Contains(name))
+                {
+                    _log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during request", name);
+                    continue;
+                }
+
+                var value = src.Headers[name];
+                if (string.IsNullOrEmpty(value)) continue;
+
+                if (dst.Content != null && name.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
+                    dst.Content.Headers.TryAddWithoutValidation(name, value);
+                else
+                    dst.Headers.TryAddWithoutValidation(name, value);
+            }
+        }
+
+        private void CopyResponseHeaders(HttpResponseMessage src, HttpListenerResponse dst)
+        {
+            foreach (var header in src.Headers)
+            {
+                if (SkipResponseHeaders.Contains(header.Key) || HopByHop.Contains(header.Key))
+                {
+                    _log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during response", header.Key);
+                    continue;
+                }
+                TrySetHeader(dst, header.Key, header.Value);
+            }
+
+            foreach (var header in src.Content.Headers)
+            {
+                if (SkipResponseHeaders.Contains(header.Key) || HopByHop.Contains(header.Key))
+                {
+                    _log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during response", header.Key);
+                    continue;
+                }
+
+                if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (src.Content.Headers.ContentType != null)
+                        dst.ContentType = src.Content.Headers.ContentType.ToString();
+                }
+                else
+                {
+                    TrySetHeader(dst, header.Key, header.Value);
+                }
+            }
+
+            _log.LogDebug("⇠ Response headers: {Headers}", string.Join(", ", src.Headers.Select(h => $"{h.Key}: {string.Join(";", h.Value)}")));
+        }
+
+        private static void TrySetHeader(HttpListenerResponse res, string key, IEnumerable<string> values)
+        {
+            try { res.Headers[key] = string.Join(", ", values); }
+            catch { /* restricted by HttpListener; ignore */ }
+        }
+
+        private void WriteCors(HttpListenerRequest req, HttpListenerResponse res)
+        {
+            var origin = req.Headers["Origin"];
+            if (string.IsNullOrEmpty(origin)) return;
+
+            var reqHeaders = req.Headers["Access-Control-Request-Headers"];
+
+            res.Headers["Access-Control-Allow-Origin"] = origin;
+            res.Headers["Vary"] = "Origin";
+            res.Headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+            res.Headers["Access-Control-Allow-Credentials"] = "true";
+            res.Headers["Access-Control-Max-Age"] = "86400";
+
+            if (!string.IsNullOrEmpty(reqHeaders))
+                res.Headers["Access-Control-Allow-Headers"] = reqHeaders;
+
+            _log.LogDebug(LogEvent.CORSDecision, "CORS applied for origin {Origin}", origin);
+        }
+
+        public static (string ollamaMuxHost, string ollamaExecutionHost) GetHosts()
+        {
+            var muxEnv = Environment.GetEnvironmentVariable("OLLAMA_HOST");
+            var execEnv = Environment.GetEnvironmentVariable("OLLAMA_EXEC_HOST");
+
+            var defaultMux = $"http://127.0.0.1:{OllamaDefaultPort}/";
+            var defaultExec = $"http://127.0.0.1:{OllamaExecutionPort}/";
+
+            string mux = defaultMux;
+            string exec = defaultExec;
+
+            if (!string.IsNullOrWhiteSpace(muxEnv))
+            {
+                try
+                {
+                    var uri = ParseToAbsoluteUri(muxEnv);
+                    if (!IsLoopbackHost(uri.Host)) { /* warn if needed */ }
+                    mux = EnsureSlash(uri.ToString());
+                }
+                catch { /* fallback to default */ }
+            }
+
+            if (!string.IsNullOrWhiteSpace(execEnv))
+            {
+                try
+                {
+                    var uri = ParseToAbsoluteUri(execEnv);
+                    exec = EnsureSlash(uri.ToString());
+                }
+                catch { /* fallback to default */ }
+            }
+
+            return (mux, exec);
+        }
+
+        private static Uri NormalizeBaseUri(string uri)
+        {
+            var abs = ParseToAbsoluteUri(uri);
+            return new Uri(EnsureSlash(abs.ToString()), UriKind.Absolute);
+        }
+
+        private static Uri ParseToAbsoluteUri(string value)
+        {
+            var uri = new Uri(value, UriKind.RelativeOrAbsolute);
+            if (!uri.IsAbsoluteUri)
+                uri = new Uri($"http://{value}", UriKind.Absolute);
+            return uri;
+        }
+
+        private static string EnsureSlash(string s) => s.EndsWith("/") ? s : s + "/";
+
+        private static bool UriEquals(Uri a, Uri b)
+        {
+            return string.Equals(a.Scheme, b.Scheme, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(a.Host, b.Host, StringComparison.OrdinalIgnoreCase)
+                && a.Port == b.Port
+                && string.Equals(a.AbsolutePath.TrimEnd('/'), b.AbsolutePath.TrimEnd('/'), StringComparison.Ordinal);
+        }
+
+        private static bool IsLoopbackHost(string host)
+        {
+            if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (IPAddress.TryParse(host, out var ip))
+                return IPAddress.IsLoopback(ip);
+
+            return false;
+        }
+
+        private static string FormatHeaders(System.Collections.Specialized.NameValueCollection headers)
+        {
+            var pairs = headers.AllKeys
+                .Where(k => !string.IsNullOrEmpty(k) && !string.Equals(k, "Authorization", StringComparison.OrdinalIgnoreCase))
+                .Select(k => $"{k}: {headers[k] ?? ""}");
+
+            return string.Join(", ", pairs);
+        }
+    }
+
+    internal static class Log
+    {
+        public static ILoggerFactory CreateFactory()
+        {
+            var min = ParseLevel(Environment.GetEnvironmentVariable("OLLAMAMUX_LOG_LEVEL")) ?? LogLevel.Information;
+            var json = IsEnabled(Environment.GetEnvironmentVariable("OLLAMAMUX_LOG_JSON"));
+
+            return LoggerFactory.Create(builder =>
+            {
+                builder.SetMinimumLevel(min);
+                if (json)
+                {
+                    builder.AddJsonConsole(o =>
+                    {
+                        o.IncludeScopes = true;
+                        o.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+                        o.UseUtcTimestamp = true;
+                    });
+                }
+                else
+                {
+                    builder.AddSimpleConsole(o =>
+                    {
+                        o.IncludeScopes = true;
+                        o.SingleLine = true;
+                        o.TimestampFormat = "HH:mm:ss.fff ";
+                    });
+                }
+            });
+        }
+
+        private static LogLevel? ParseLevel(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            return Enum.TryParse<LogLevel>(s, true, out var lvl) ? lvl : null;
+        }
+
+        private static bool IsEnabled(string? s)
+            => !string.IsNullOrWhiteSpace(s) && s.Equals("true", StringComparison.OrdinalIgnoreCase);
     }
 }
