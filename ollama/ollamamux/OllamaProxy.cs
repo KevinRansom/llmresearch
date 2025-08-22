@@ -12,6 +12,7 @@ namespace OllamaMux
     using System.Net;
     using System.Net.Http;
     using System.Net.Http.Headers;
+    using System.Net.Sockets;
     using System.Reflection;
     using System.Text;
     using System.Threading;
@@ -61,6 +62,7 @@ namespace OllamaMux
             "Content-Length","Transfer-Encoding","Connection","Keep-Alive","Server","Date","Proxy-Connection"
         };
 
+        // Checks the mux on 11434 via /__mux/health
         public async Task<bool> IsProxyAlreadyRunningAsync()
         {
             var (ollamaMuxHost, _) = GetHosts();
@@ -80,6 +82,33 @@ namespace OllamaMux
                 _log.LogDebug(LogEvent.HealthCheckFailed, ex, "Health check failed for {ProbeUri}", probeUri);
                 return false;
             }
+        }
+
+        // NEW: Checks whether the backend (ollama) is already listening on 11435
+        public static async Task<bool> IsExecutionAlreadyRunningAsync(TimeSpan timeout)
+        {
+            var (_, execHost) = GetHosts();
+            var uri = new Uri(execHost, UriKind.Absolute);
+
+            var host = NormalizeProbeHost(uri.Host);
+            var port = uri.Port;
+
+            return await CanConnectAsync(host, port, timeout);
+        }
+
+        // NEW: Waits until the backend port is reachable (or budget expires)
+        public static async Task<bool> WaitForExecutionAliveAsync(TimeSpan budget, TimeSpan? pollInterval = null)
+        {
+            var interval = pollInterval ?? TimeSpan.FromMilliseconds(250);
+            var sw = Stopwatch.StartNew();
+            while (sw.Elapsed < budget)
+            {
+                if (await IsExecutionAlreadyRunningAsync(TimeSpan.FromMilliseconds(500)))
+                    return true;
+
+                await Task.Delay(interval);
+            }
+            return false;
         }
 
         private const string MutexName = @"Global\ollamamux-serve";
@@ -193,7 +222,6 @@ namespace OllamaMux
             if (detached)
             {
                 // Spawn a detached `serve` instance of *this* executable
-                // The assembly name will be .dll, so change it to the extension of the launcher
                 var exePath = Path.ChangeExtension(Assembly.GetExecutingAssembly().Location, "exe");
                 if (!OllamaProcess.TryLaunchRunProgramDetachedDetached(exePath, "serve"))
                     throw new InvalidOperationException("Failed to launch ollamamux in detached mode.");
@@ -222,16 +250,87 @@ namespace OllamaMux
             var rid = Guid.NewGuid().ToString("n")[..8];
             using var _ = _log.BeginScope(new Dictionary<string, object> { ["rid"] = rid });
 
-            var sw = Stopwatch.StartNew();
+            var swTotal = Stopwatch.StartNew();
             var request = context.Request;
             var response = context.Response;
 
-            // await nop
-            await Task.Yield();
+            try
+            {
+                await Task.Yield();
 
-            _log.LogInformation(LogEvent.RequestReceived,
-                "→ {Method} {PathQuery} (from {Remote}) Headers: {Headers} [rid:{Rid}]",
-                request.HttpMethod, request.Url?.PathAndQuery, request.RemoteEndPoint, FormatHeaders(request.Headers), rid);
+                _log.LogInformation(LogEvent.RequestReceived,
+                    "→ {Method} {PathQuery} (from {Remote}) Headers: {Headers} [rid:{Rid}]",
+                    request.HttpMethod, request.Url?.PathAndQuery,
+                    request.RemoteEndPoint, FormatHeaders(request.Headers), rid);
+
+                // Handle CORS preflight
+                if (string.Equals(request.HttpMethod, "OPTIONS", StringComparison.OrdinalIgnoreCase))
+                {
+                    WriteCors(request, response);
+                    response.StatusCode = (int)HttpStatusCode.NoContent;
+                    return;
+                }
+
+                // Prepare outbound request
+                var targetUri = new Uri(targetBase, request.Url?.PathAndQuery ?? string.Empty);
+
+                var hasBody = request.HasEntityBody;
+                var bodyBytes = Array.Empty<byte>();
+                if (hasBody)
+                {
+                    using var ms = new MemoryStream();
+                    await request.InputStream.CopyToAsync(ms);
+                    bodyBytes = ms.ToArray();
+                }
+
+                using var outgoing = new HttpRequestMessage(new HttpMethod(request.HttpMethod), targetUri);
+                if (hasBody)
+                    outgoing.Content = new ByteArrayContent(bodyBytes);
+
+                CopyRequestHeaders(request, outgoing);
+
+                // Send to upstream
+                var swUpstream = Stopwatch.StartNew();
+                using var upstreamResponse = await Upstream.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead);
+                swUpstream.Stop();
+
+                _log.LogInformation(LogEvent.UpstreamResponded,
+                    "← {Status} {Reason} in {Elapsed} ms [rid:{Rid}]",
+                    (int)upstreamResponse.StatusCode, upstreamResponse.ReasonPhrase,
+                    swUpstream.ElapsedMilliseconds, rid);
+
+                // Write response
+                response.StatusCode = (int)upstreamResponse.StatusCode;
+                response.StatusDescription = upstreamResponse.ReasonPhrase ?? string.Empty;
+                CopyResponseHeaders(upstreamResponse, response);
+                WriteCors(request, response);
+
+                await using (var respStream = await upstreamResponse.Content.ReadAsStreamAsync())
+                {
+                    await respStream.CopyToAsync(response.OutputStream);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Error handling request [rid:{Rid}]", rid);
+                try
+                {
+                    response.StatusCode = 502;
+                    using var writer = new StreamWriter(response.OutputStream);
+                    await writer.WriteAsync("Proxy error");
+                }
+                catch { /* ignore secondary failures */ }
+            }
+            finally
+            {
+                swTotal.Stop();
+                _log.LogInformation(LogEvent.RequestCompleted,
+                    "✓ {Method} {PathQuery} {Status} in {Elapsed} ms total [rid:{Rid}]",
+                    request.HttpMethod, request.Url?.PathAndQuery,
+                    response.StatusCode, swTotal.ElapsedMilliseconds, rid);
+
+                try { response.OutputStream.Close(); } catch { }
+            }
         }
 
         private void CopyRequestHeaders(HttpListenerRequest src, HttpRequestMessage dst)
@@ -391,6 +490,32 @@ namespace OllamaMux
                 .Select(k => $"{k}: {headers[k] ?? ""}");
 
             return string.Join(", ", pairs);
+        }
+
+        // NEW: helpers for backend probing
+
+        private static async Task<bool> CanConnectAsync(string host, int port, TimeSpan timeout)
+        {
+            using var client = new TcpClient();
+            try
+            {
+                var connectTask = client.ConnectAsync(host, port);
+                var completed = await Task.WhenAny(connectTask, Task.Delay(timeout));
+                return completed == connectTask && client.Connected;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string NormalizeProbeHost(string host)
+        {
+            // 0.0.0.0 or '+' aren’t connectable probe targets; map to loopback for checks.
+            if (string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(host, "+", StringComparison.OrdinalIgnoreCase))
+                return "127.0.0.1";
+            return host;
         }
     }
 

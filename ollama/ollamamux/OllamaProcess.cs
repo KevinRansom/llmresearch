@@ -39,7 +39,28 @@
             return true; // Indicates success
         }
 
-        public static async Task<int> RunAsync(string[] args, string? ollamaExecutionHost)
+        public static void RunForeground(string[] args, string ollamaHost)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "ollama",
+                RedirectStandardOutput = false,
+                RedirectStandardError = false,
+                RedirectStandardInput = false,
+                UseShellExecute = false
+            };
+
+            foreach (var arg in args)
+            {
+                psi.ArgumentList.Add(arg);
+            }
+            psi.Environment["OLLAMA_HOST"] = ollamaHost;
+
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit();
+        }
+
+    public static async Task<int> RunAsync(string[] args, string? ollamaExecutionHost)
         {
             var binaryName = OperatingSystem.IsWindows() ? "ollama.exe" : "ollama";
             try
