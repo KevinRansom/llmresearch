@@ -142,9 +142,10 @@ namespace OllamaMux
                     // Double‑check under the lock
                     if (await proxy.IsProxyAlreadyRunningAsync()) return true;
 
-                    if (!OllamaProcess.TryLaunchRunProgramDetachedDetached(
-                            Assembly.GetExecutingAssembly().Location, "serve"))
+                    if (OllamaProcess.TryLaunchRunProgramDetachedDetached(Path.ChangeExtension(Assembly.GetExecutingAssembly().Location, "exe"), "serve"))
+                    {
                         return false;
+                    }
 
                     // Wait for health
                     var sw = Stopwatch.StartNew();
@@ -222,8 +223,7 @@ namespace OllamaMux
             if (detached)
             {
                 // Spawn a detached `serve` instance of *this* executable
-                var exePath = Path.ChangeExtension(Assembly.GetExecutingAssembly().Location, "exe");
-                if (!OllamaProcess.TryLaunchRunProgramDetachedDetached(exePath, "serve"))
+                if (!OllamaProcess.TryLaunchRunProgramDetachedDetached(Path.ChangeExtension(Assembly.GetExecutingAssembly().Location, "exe"), "serve"))
                     throw new InvalidOperationException("Failed to launch ollamamux in detached mode.");
             }
             else
@@ -274,27 +274,36 @@ namespace OllamaMux
                 // Prepare outbound request
                 var targetUri = new Uri(targetBase, request.Url?.PathAndQuery ?? string.Empty);
 
-                var hasBody = request.HasEntityBody;
-                var bodyBytes = Array.Empty<byte>();
-                if (hasBody)
-                {
-                    using var ms = new MemoryStream();
-                    await request.InputStream.CopyToAsync(ms);
-                    bodyBytes = ms.ToArray();
-                }
-
                 using var outgoing = new HttpRequestMessage(new HttpMethod(request.HttpMethod), targetUri);
-                if (hasBody)
-                    outgoing.Content = new ByteArrayContent(bodyBytes);
-
-                CopyRequestHeaders(request, outgoing);
+                if (request.HasEntityBody)
+                {
+                    // Stream directly from inbound InputStream to upstream
+                    outgoing.Content = new StreamContent(request.InputStream);
+                
+                    // ✅ First copy over all *general* headers (Host, Accept-Encoding still skipped)
+                    CopyRequestHeaders(request, outgoing);
+                
+                    // ✅ Now try to preserve inbound content headers explicitly (in case the above skipped any)
+                    foreach (string headerName in request.Headers)
+                    {
+                        if (!SkipRequestHeaders.Contains(headerName) && 
+                            headerName.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
+                        {
+                            outgoing.Content.Headers.TryAddWithoutValidation(headerName, request.Headers[headerName]);
+                        }
+                    }
+                }
+                else
+                {
+                    CopyRequestHeaders(request, outgoing);
+                }
 
                 // Send to upstream
                 var swUpstream = Stopwatch.StartNew();
                 using var upstreamResponse = await Upstream.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead);
                 swUpstream.Stop();
 
-                _log.LogInformation(LogEvent.UpstreamResponded,
+                _log.LogInformation(LogEvent.UpstreamResponse,
                     "← {Status} {Reason} in {Elapsed} ms [rid:{Rid}]",
                     (int)upstreamResponse.StatusCode, upstreamResponse.ReasonPhrase,
                     swUpstream.ElapsedMilliseconds, rid);
@@ -316,6 +325,11 @@ namespace OllamaMux
                 try
                 {
                     response.StatusCode = 502;
+            
+                    // ✅ Always advertise a sensible type for the error payload
+                    if (string.IsNullOrEmpty(response.ContentType))
+                        response.ContentType = "text/plain; charset=utf-8";
+            
                     using var writer = new StreamWriter(response.OutputStream);
                     await writer.WriteAsync("Proxy error");
                 }
@@ -517,46 +531,5 @@ namespace OllamaMux
                 return "127.0.0.1";
             return host;
         }
-    }
-
-    internal static class Log
-    {
-        public static ILoggerFactory CreateFactory()
-        {
-            var min = ParseLevel(Environment.GetEnvironmentVariable("OLLAMAMUX_LOG_LEVEL")) ?? LogLevel.Information;
-            var json = IsEnabled(Environment.GetEnvironmentVariable("OLLAMAMUX_LOG_JSON"));
-
-            return LoggerFactory.Create(builder =>
-            {
-                builder.SetMinimumLevel(min);
-                if (json)
-                {
-                    builder.AddJsonConsole(o =>
-                    {
-                        o.IncludeScopes = true;
-                        o.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-                        o.UseUtcTimestamp = true;
-                    });
-                }
-                else
-                {
-                    builder.AddSimpleConsole(o =>
-                    {
-                        o.IncludeScopes = true;
-                        o.SingleLine = true;
-                        o.TimestampFormat = "HH:mm:ss.fff ";
-                    });
-                }
-            });
-        }
-
-        private static LogLevel? ParseLevel(string? s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return null;
-            return Enum.TryParse<LogLevel>(s, true, out var lvl) ? lvl : null;
-        }
-
-        private static bool IsEnabled(string? s)
-            => !string.IsNullOrWhiteSpace(s) && s.Equals("true", StringComparison.OrdinalIgnoreCase);
     }
 }

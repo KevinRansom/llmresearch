@@ -10,29 +10,36 @@
             try
             {
                 var proxy = new OllamaProxy();
+                var command = args[0];
 
-                // Start both mux and backend in the same process/window
-                if (args.Length > 0 && string.Equals(args[0], "serve", StringComparison.OrdinalIgnoreCase))
+                if (OllamaCommandHandler.IsForegroundRequired(command))
                 {
-                    // Proxy first
-                    proxy.StartProxy(detached: false);
+                    // Only start proxy if it's not already bound
+                    if (!await OllamaProxy.IsExecutionAlreadyRunningAsync(TimeSpan.FromMilliseconds(500)))
+                    {
+                        proxy.StartProxy(detached: false);
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("Reusing existing proxy on port 11434.");
+                    }
 
-                    // Foreground backend serve on 11435 so logs stream here
-                    OllamaProcess.RunForeground(new[] { "serve" }, "http://127.0.0.1:11435");
+                    // Foreground backend so logs stream here
+                    OllamaProcess.RunForeground(args, "http://127.0.0.1:11435");
 
-                    // When backend exits, end process
-                    return 0;
+                    var handler = new OllamaCommandHandler();
+                    return (int)await handler.ExecuteAsync(args);
                 }
 
-                // For any other command, make sure backend is up
+                // No proxy required — ensure backend is running
                 if (!await OllamaProxy.IsExecutionAlreadyRunningAsync(TimeSpan.FromMilliseconds(500)))
                 {
                     Console.Error.WriteLine("Execution backend not responding on port 11435.");
                     return 1;
                 }
 
-                var handler = new OllamaCommandHandler();
-                return (int)await handler.ExecuteAsync(args);
+                var fallbackHandler = new OllamaCommandHandler();
+                return (int)await fallbackHandler.ExecuteAsync(args);
             }
             catch (Exception ex)
             {

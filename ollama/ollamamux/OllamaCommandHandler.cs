@@ -2,7 +2,6 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Threading.Tasks;
 
     public class OllamaCommandHandler
@@ -14,16 +13,17 @@
             Error
         }
 
-        // Keep the sets if you’ll use them later, but we won’t branch on them here.
-        private static readonly HashSet<string> ProxyRequiredCommands = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly HashSet<string> ForegroundRequiredCommands = new(StringComparer.OrdinalIgnoreCase)
         {
-            "serve", "run", "create"
+            "serve", "run" // stream backend output inline for both
         };
 
         private static readonly HashSet<string> NoProxyRequiredCommands = new(StringComparer.OrdinalIgnoreCase)
         {
-            "list", "ps", "show", "pull", "push", "cp", "rm", "help", "--version", "stop"
+            "list", "ps", "show", "pull", "push", "cp", "rm", "help", "--version", "stop", "create"
         };
+
+        public static bool IsForegroundRequired(string command) => ForegroundRequiredCommands.Contains(command);
 
         public async Task<CommandOutcome> ExecuteAsync(string[] args)
         {

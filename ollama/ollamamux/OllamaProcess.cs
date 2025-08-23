@@ -1,6 +1,8 @@
-﻿namespace OllamaMux
+﻿
+namespace OllamaMux
 {
     using System;
+    using System.Collections.Generic;
     using System.ComponentModel;
     using System.Diagnostics;
     using System.Linq;
@@ -11,21 +13,21 @@
 
     static class OllamaProcess
     {
-        static public bool TryLaunchRunProgramDetachedDetached(string path, string arguments)
+        public static bool TryLaunchRunProgramDetachedDetached(string path, string arguments)
         {
             int? exitCode;
             var psi = new ProcessStartInfo
             {
                 FileName = path,
                 Arguments = arguments,
-                UseShellExecute = false,                // allows monitoring
+                UseShellExecute = false, // allows monitoring
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
 
             var proc = Process.Start(psi);
-            bool? exitedEarly = proc?.WaitForExit(3000);  // Wait briefly for crash
+            bool? exitedEarly = proc?.WaitForExit(3000); // Wait briefly for crash
 
             if (exitedEarly.GetValueOrDefault())
             {
@@ -39,87 +41,107 @@
             return true; // Indicates success
         }
 
-        public static void RunForeground(string[] args, string ollamaHost)
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "ollama",
-                RedirectStandardOutput = false,
-                RedirectStandardError = false,
-                RedirectStandardInput = false,
-                UseShellExecute = false
-            };
-
-            foreach (var arg in args)
-            {
-                psi.ArgumentList.Add(arg);
-            }
-            psi.Environment["OLLAMA_HOST"] = ollamaHost;
-
-            using var proc = Process.Start(psi);
-            proc?.WaitForExit();
-        }
-
-    public static async Task<int> RunAsync(string[] args, string? ollamaExecutionHost)
+        public static async Task<int?> RunProcessAsync(
+            string[] args,
+            string? ollamaExecutionHost,
+            bool captureOutput,
+            bool asyncMode)
         {
             var binaryName = OperatingSystem.IsWindows() ? "ollama.exe" : "ollama";
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = binaryName,
+                Arguments = string.Join(" ", args),
+                RedirectStandardOutput = captureOutput,
+                RedirectStandardError = captureOutput,
+                RedirectStandardInput = false,
+                UseShellExecute = false,
+                CreateNoWindow = captureOutput
+            };
+
+            if (captureOutput)
+            {
+                psi.StandardOutputEncoding = Encoding.UTF8;
+                psi.StandardErrorEncoding = Encoding.UTF8;
+            }
+
+            if (ollamaExecutionHost != null)
+            {
+                psi.Environment["OLLAMA_HOST"] = ollamaExecutionHost;
+                Console.WriteLine($"[✓] Set OLLAMA_HOST={ollamaExecutionHost}");
+            }
+
             try
             {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = binaryName,
-                    Arguments = string.Join(" ", args),
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
+                using var process = new Process { StartInfo = psi };
 
-                if (ollamaExecutionHost != null)
+                if (captureOutput)
                 {
-                    startInfo.EnvironmentVariables["OLLAMA_HOST"] = ollamaExecutionHost;
-                    Console.WriteLine($"[✓] Set OLLAMA_HOST={ollamaExecutionHost}");
+                    process.OutputDataReceived += (sender, e) =>
+                    {
+                        if (e.Data != null) Console.WriteLine(FilterOutput(e.Data));
+                    };
+
+                    process.ErrorDataReceived += (sender, e) =>
+                    {
+                        if (e.Data != null) Console.Error.WriteLine(FilterOutput(e.Data));
+                    };
                 }
 
-                using var process = new Process { StartInfo = startInfo };
-                process.OutputDataReceived += (sender, e) =>
-                {
-                    if (e.Data != null)
-                        Console.WriteLine(FilterOutput(e.Data));
-                };
-                process.ErrorDataReceived += (sender, e) =>
-                {
-                    if (e.Data != null)
-                        Console.Error.WriteLine(FilterOutput(e.Data));
-                };
-
                 process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
 
-                await process.WaitForExitAsync();
-                return process.ExitCode;
+                if (captureOutput)
+                {
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+                }
+
+                if (asyncMode)
+                {
+                    await process.WaitForExitAsync();
+                    return process.ExitCode;
+                }
+                else
+                {
+                    process.WaitForExit();
+                    return null; // matches RunForeground’s “no exit code” signature
+                }
             }
             catch (Win32Exception)
             {
-                Console.Error.WriteLine($"'{binaryName}' not found. Please ensure Ollama is installed and available in your system PATH.");
-                return -1;
+                Console.Error.WriteLine(
+                    $"'{binaryName}' not found. Please ensure Ollama is installed and in your PATH.");
+                return asyncMode ? -1 : null;
             }
+        }
+
+        public static void RunForeground(string[] args, string ollamaExecutionHost)
+        {
+            RunProcessAsync(args, ollamaExecutionHost, captureOutput: false, asyncMode: false)
+                .GetAwaiter()
+                .GetResult();
+        }
+
+        public static Task<int> RunAsync(string[] args, string? ollamaExecutionHost)
+        {
+            return RunProcessAsync(args, ollamaExecutionHost, captureOutput: true, asyncMode: true)
+                .ContinueWith(t => t.Result ?? 0);
         }
 
         private static string FilterOutput(string line)
         {
-            // Skip filtering if line contains known exclusions
-            if (line.Contains("OLLAMA_") ||
+            bool hasExclusion =
+                line.Contains("OLLAMA_") ||
                 line.Contains("ollama/") ||
-                line.Contains("/") ||
                 line.Contains("http") ||
                 line.Contains(".com") ||
                 line.Contains("docker") ||
-                line.Contains("/usr"))
+                line.Contains("/usr");
+
+            if (hasExclusion)
             {
+                // Nothing to rewrite – just return as-is.
                 return line;
             }
 
