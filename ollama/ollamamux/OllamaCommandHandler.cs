@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading.Tasks;
 
     public class OllamaCommandHandler
@@ -23,13 +24,22 @@
             "list", "ps", "show", "pull", "push", "cp", "rm", "help", "--version", "stop", "create"
         };
 
-        public static bool IsForegroundRequired(string command) => ForegroundRequiredCommands.Contains(command);
+        public static string GetCommand(string[] args)
+        {
+            args = args is { Length: > 0 } ? args : Array.Empty<string>();
+            return (args != Array.Empty<string>() && args.Length > 1) ? args[0] : "";
+        }
 
+        public static bool IsForegroundRequired(string[] args) => ForegroundRequiredCommands.Contains(GetCommand(args));
+
+        public static bool IsNoProxyRequired(string[] args) => NoProxyRequiredCommands.Contains(GetCommand(args));
+
+        public static bool IsInValidArguments(string[] args)
+        {
+            return !IsForegroundRequired(args) && !IsNoProxyRequired(args);
+        }
         public async Task<CommandOutcome> ExecuteAsync(string[] args)
         {
-            if (args.Length == 0)
-                return CommandOutcome.Executed;
-
             var (_, execHost) = OllamaProxy.GetHosts();
 
             // Always run the underlying ollama command against the execution host (11435).

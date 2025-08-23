@@ -8,6 +8,17 @@ namespace OllamaMuxTests
     public class OllamaCommands
     {
         [Fact]
+        public async Task EmptyCommand_ShouldShowHelp()
+        {
+            var (output, errors, exitCode) = await ProcessRunner.RunAsync(
+                "ollamamux.exe",
+                "",
+                TimeSpan.FromSeconds(10));
+            return;
+        }
+
+
+        [Fact]
         public async Task ListCommand_ShouldReturnModels()
         {
             var (output, errors, exitCode) = await ProcessRunner.RunAsync(

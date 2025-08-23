@@ -66,7 +66,6 @@ namespace OllamaMux
             if (ollamaExecutionHost != null)
             {
                 psi.Environment["OLLAMA_HOST"] = ollamaExecutionHost;
-                Console.WriteLine($"[✓] Set OLLAMA_HOST={ollamaExecutionHost}");
             }
 
             try
