@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36327.8
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ollamamux.tests", "ollamamux.tests\ollamamux.tests.csproj", "{4F05CBFF-0C93-4708-84B1-3670E4839AC9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ollamamux", "ollamamux\ollamamux.csproj", "{003BA2FA-67C1-3864-D878-4A37FAE77C45}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4F05CBFF-0C93-4708-84B1-3670E4839AC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F05CBFF-0C93-4708-84B1-3670E4839AC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F05CBFF-0C93-4708-84B1-3670E4839AC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F05CBFF-0C93-4708-84B1-3670E4839AC9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{003BA2FA-67C1-3864-D878-4A37FAE77C45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{003BA2FA-67C1-3864-D878-4A37FAE77C45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{003BA2FA-67C1-3864-D878-4A37FAE77C45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{003BA2FA-67C1-3864-D878-4A37FAE77C45}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {DF151984-B166-4EBD-B5E8-8BC8BCA4EE31}
+	EndGlobalSection
+EndGlobal

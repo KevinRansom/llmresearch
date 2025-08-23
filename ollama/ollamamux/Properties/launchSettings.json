@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ollamamux": {
+      "commandName": "Project",
+      "commandLineArgs": "serve"
+    }
+  }
+}
