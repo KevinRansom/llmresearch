@@ -27,7 +27,7 @@
                         }
 
                         // Foreground backend so logs stream here
-                        OllamaProcess.RunForeground(args, "http://127.0.0.1:11435");
+                        await OllamaProcess.RunForeground(args, "http://127.0.0.1:11435");
                         return 0;
                     }
                     else

@@ -21,7 +21,7 @@
 
         private static readonly HashSet<string> NoProxyRequiredCommands = new(StringComparer.OrdinalIgnoreCase)
         {
-            "list", "ps", "show", "pull", "push", "cp", "rm", "help", "--version", "stop", "create"
+            "list", "ps", "show", "pull", "push", "cp", "rm", "help", "--help", "-h", "--version", "stop", "create"
         };
 
         public static string GetCommand(string[] args)
