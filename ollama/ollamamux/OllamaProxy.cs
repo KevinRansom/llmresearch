@@ -77,9 +77,9 @@ namespace OllamaMux
                        body.Contains("\"acknowledged\":true", StringComparison.OrdinalIgnoreCase) &&
                        body.Contains(AckGuid, StringComparison.OrdinalIgnoreCase);
             }
-            catch (Exception ex)
+            catch (Exception _ex)
             {
-                _log.LogDebug(LogEvent.HealthCheckFailed, ex, "Health check failed for {ProbeUri}", probeUri);
+                //@@@@_log.LogDebug(LogEvent.HealthCheckFailed, ex, "Health check failed for {ProbeUri}", probeUri);
                 return false;
             }
         }
@@ -126,9 +126,9 @@ namespace OllamaMux
                     {
                         break;
                     }
-                    catch (Exception ex)
+                    catch (Exception _ex)
                     {
-                        _log.LogError(ex, "Accept loop error");
+                        //@@@@ _log.LogError(ex, "Accept loop error");
                         if (ctx != null)
                         {
                             try { ctx.Response.StatusCode = 500; ctx.Response.OutputStream.Close(); } catch { }
@@ -137,8 +137,8 @@ namespace OllamaMux
                 }
             });
 
-            _log.LogInformation(LogEvent.ProxyStart, "Proxy listening on {MuxBase}", muxBase);
-            _log.LogInformation("Forwarding to Ollama at {ExecBase}", execBase);
+            //@@@@_log.LogInformation(LogEvent.ProxyStart, "Proxy listening on {MuxBase}", muxBase);
+            //@@@@_log.LogInformation("Forwarding to Ollama at {ExecBase}", execBase);
             return Task.CompletedTask;
         }
 
@@ -171,10 +171,10 @@ namespace OllamaMux
             {
                 await Task.Yield();
 
-                _log.LogInformation(LogEvent.RequestReceived,
-                    "→ {Method} {PathQuery} (from {Remote}) Headers: {Headers} [rid:{Rid}]",
-                    request.HttpMethod, request.Url?.PathAndQuery,
-                    request.RemoteEndPoint, FormatHeaders(request.Headers), rid);
+                //@@@@_log.LogInformation(LogEvent.RequestReceived,
+                //@@@@    "→ {Method} {PathQuery} (from {Remote}) Headers: {Headers} [rid:{Rid}]",
+                //@@@@    request.HttpMethod, request.Url?.PathAndQuery,
+                //@@@@    request.RemoteEndPoint, FormatHeaders(request.Headers), rid);
 
                 // Handle CORS preflight
                 if (string.Equals(request.HttpMethod, "OPTIONS", StringComparison.OrdinalIgnoreCase))
@@ -216,10 +216,10 @@ namespace OllamaMux
                 using var upstreamResponse = await Upstream.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead);
                 swUpstream.Stop();
 
-                _log.LogInformation(LogEvent.UpstreamResponse,
-                    "← {Status} {Reason} in {Elapsed} ms [rid:{Rid}]",
-                    (int)upstreamResponse.StatusCode, upstreamResponse.ReasonPhrase,
-                    swUpstream.ElapsedMilliseconds, rid);
+                //@@@@_log.LogInformation(LogEvent.UpstreamResponse,
+                //@@@@    "← {Status} {Reason} in {Elapsed} ms [rid:{Rid}]",
+                //@@@@    (int)upstreamResponse.StatusCode, upstreamResponse.ReasonPhrase,
+                //@@@@    swUpstream.ElapsedMilliseconds, rid);
 
                 // Write response
                 response.StatusCode = (int)upstreamResponse.StatusCode;
@@ -232,9 +232,9 @@ namespace OllamaMux
                     await respStream.CopyToAsync(response.OutputStream);
                 }
             }
-            catch (Exception ex)
+            catch (Exception _ex)
             {
-                _log.LogError(ex, "Error handling request [rid:{Rid}]", rid);
+                //@@@@_log.LogError(ex, "Error handling request [rid:{Rid}]", rid);
                 try
                 {
                     response.StatusCode = 502;
@@ -251,10 +251,10 @@ namespace OllamaMux
             finally
             {
                 swTotal.Stop();
-                _log.LogInformation(LogEvent.RequestCompleted,
-                    "✓ {Method} {PathQuery} {Status} in {Elapsed} ms total [rid:{Rid}]",
-                    request.HttpMethod, request.Url?.PathAndQuery,
-                    response.StatusCode, swTotal.ElapsedMilliseconds, rid);
+                //@@@@_log.LogInformation(LogEvent.RequestCompleted,
+                //@@@@    "✓ {Method} {PathQuery} {Status} in {Elapsed} ms total [rid:{Rid}]",
+                //@@@@    request.HttpMethod, request.Url?.PathAndQuery,
+                //@@@@    response.StatusCode, swTotal.ElapsedMilliseconds, rid);
 
                 try { response.OutputStream.Close(); } catch { }
             }
@@ -267,7 +267,7 @@ namespace OllamaMux
                 if (string.IsNullOrEmpty(name)) continue;
                 if (HopByHop.Contains(name) || SkipRequestHeaders.Contains(name))
                 {
-                    _log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during request", name);
+                    //@@@@_log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during request", name);
                     continue;
                 }
 
@@ -287,7 +287,7 @@ namespace OllamaMux
             {
                 if (SkipResponseHeaders.Contains(header.Key) || HopByHop.Contains(header.Key))
                 {
-                    _log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during response", header.Key);
+                    //@@@@_log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during response", header.Key);
                     continue;
                 }
                 TrySetHeader(dst, header.Key, header.Value);
@@ -297,7 +297,7 @@ namespace OllamaMux
             {
                 if (SkipResponseHeaders.Contains(header.Key) || HopByHop.Contains(header.Key))
                 {
-                    _log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during response", header.Key);
+                    //@@@@_log.LogTrace(LogEvent.HeaderSkipped, "Skipping header {Header} during response", header.Key);
                     continue;
                 }
 
@@ -312,7 +312,7 @@ namespace OllamaMux
                 }
             }
 
-            _log.LogDebug("⇠ Response headers: {Headers}", string.Join(", ", src.Headers.Select(h => $"{h.Key}: {string.Join(";", h.Value)}")));
+            //@@@@_log.LogDebug("⇠ Response headers: {Headers}", string.Join(", ", src.Headers.Select(h => $"{h.Key}: {string.Join(";", h.Value)}")));
         }
 
         private static void TrySetHeader(HttpListenerResponse res, string key, IEnumerable<string> values)
@@ -337,7 +337,7 @@ namespace OllamaMux
             if (!string.IsNullOrEmpty(reqHeaders))
                 res.Headers["Access-Control-Allow-Headers"] = reqHeaders;
 
-            _log.LogDebug(LogEvent.CORSDecision, "CORS applied for origin {Origin}", origin);
+            //@@@@_log.LogDebug(LogEvent.CORSDecision, "CORS applied for origin {Origin}", origin);
         }
 
         public static (string ollamaMuxHost, string ollamaExecutionHost) GetHosts()

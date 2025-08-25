@@ -44,7 +44,7 @@
 
             // Always run the underlying ollama command against the execution host (11435).
             // For 'serve', this blocks until ollama exits. For other commands, it returns when done.
-            var exitCode = await OllamaProcess.RunAsync(args, execHost);
+            var exitCode = await OllamaProcess.RunOllamaAsync(args, execHost);
             Environment.Exit(exitCode);
             return CommandOutcome.Executed;
         }

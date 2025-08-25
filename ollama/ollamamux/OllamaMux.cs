@@ -8,7 +8,8 @@
         public static async Task<int> Main(string[] args)
         {
             try
-            {   // If the arguments are not recognised fall through to ollama.exe for error handling
+            {
+                // If the arguments are not recognised fall through to ollama.exe for error handling
                 if (!OllamaCommandHandler.IsInValidArguments(args))
                 {
                     var proxy = new OllamaProxy();
@@ -27,21 +28,19 @@
 
                         // Foreground backend so logs stream here
                         OllamaProcess.RunForeground(args, "http://127.0.0.1:11435");
-
-                        var handler = new OllamaCommandHandler();
-                        return (int)await handler.ExecuteAsync(args);
+                        return 0;
                     }
-
-                    // No proxy required — ensure backend is running
-                    if (!await OllamaProxy.IsExecutionAlreadyRunningAsync(TimeSpan.FromMilliseconds(500)))
+                    else
                     {
-                        Console.Error.WriteLine("Execution backend not responding on port 11435.");
-                        return 1;
+                        var fallbackHandler = new OllamaCommandHandler();
+                        return (int)await fallbackHandler.ExecuteAsync(args);
                     }
                 }
-
-                var fallbackHandler = new OllamaCommandHandler();
-                return (int)await fallbackHandler.ExecuteAsync(args);
+                else
+                {
+                    var fallbackHandler = new OllamaCommandHandler();
+                    return (int)await fallbackHandler.ExecuteAsync(args);
+                }
             }
             catch (Exception ex)
             {
