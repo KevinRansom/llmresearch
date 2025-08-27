@@ -176,7 +176,7 @@ Environment Variables:
         }
 
         [Theory]
-        [InlineData("ollamamux.exe", "run gemma3:1B")]
+        [InlineData(@"C:\Users\kevinr\AppData\Local\Programs\Ollama\ollama.exe", "run gemma3:1B")]
         public async Task ListCommand_ShouldRunModel_WithBye_ExpectHelloWorld(string app, string args)
         {
             var (stdout, stderr) = await ProcessRunner.RunAndCaptureAsync(

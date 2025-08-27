@@ -19,7 +19,7 @@
                         // Only start proxy if it's not already bound
                         if (!await OllamaProxy.IsExecutionAlreadyRunningAsync(TimeSpan.FromMilliseconds(500)))
                         {
-                            proxy.StartProxy(detached: false);
+                            proxy.StartProxy(detached: OllamaCommandHandler.IsDetachedRequired(args));
                         }
                         else
                         {
